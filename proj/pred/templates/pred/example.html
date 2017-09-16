@@ -1,0 +1,23 @@
+{% extends "pred/base_layout.html" %}
+
+{%block content_right_panel %}
+    {% if username %}
+      {% include "pred/user_header.html" %}
+    {% endif %}
+   <h2>Example results</h2>
+
+   <p>
+   The result page of an example job for SCAMPI-single: 
+   <a href="/pred/result/example_scampi_single"> A job for SCAMPI-single</a>
+   </p>
+   <p>
+   The result page of an example job for SCAMPI-msa:
+   <a href="/pred/result/example_scampi_msa"> A job for SCAMPI-msa</a>
+   </p>
+   <p>
+   A snapshot of a running job for SCAMPI-msa with three input sequences
+   <a href="{{STATIC_URL}}images/example_snapshot_scampi_msa.png"><img src="{{STATIC_URL}}images/example_snapshot_scampi_msa.thumb.png" alt="snapshot of example for SCAMPI-msa" style="border: none; height: 50;"></a>
+   </p>
+
+{% endblock %}
+

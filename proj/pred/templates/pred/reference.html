@@ -1,0 +1,26 @@
+{% extends "pred/base_layout.html" %}
+
+{%block content_right_panel %}
+    {% if username %}
+      {% include "pred/user_header.html" %}
+    {% endif %}
+   <h2>References</h2>
+   <table cellspacing=0 cellpadding=5 border=0>
+     <tr><td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+       <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td>
+     </tr>
+     <tr><td>
+         <b>SCAMPI2:</b> [<u>Please cite this paper if you find SCAMPI2 useful in your research</u>]
+         <br>
+         Improved topology predictions using the first and last hydrophobic
+         helix rule. Christoph Peters, Konstantinos D. Tsirigos, Nanjiang Shu,
+         Arne Elofsson. Bioinformatics. 2015 Dec 7. pii: btv709. [Epub ahead of print]
+         [<a href="http://www.ncbi.nlm.nih.gov/pubmed/26644416">PubMed</a>] 
+        <hr>
+     </td></tr>
+ </table>
+
+
+
+{% endblock %}
+

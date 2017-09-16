@@ -1,0 +1,10 @@
+Entering SubmitJobToQueue()
+Write scriptfile /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/runjobSPLITrst_jbOYjUSPLIT130.229.42.88SPLITSPLIT5.sh
+Getting priority
+priority=691343160
+Entering SubmitSuqJob()
+cmdline: /usr/bin/suq -b /scratch run -d /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_ -p 691343160 /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/runjobSPLITrst_jbOYjUSPLIT130.229.42.88SPLITSPLIT5.sh
+
+run cmd: cnttry = 0, MAX_TRY=5
+Leaving SubmitSuqJob() with success
+

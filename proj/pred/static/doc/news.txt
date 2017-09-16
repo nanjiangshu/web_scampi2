@@ -1,0 +1,20 @@
+# Format of this news file
+# <DATE>
+# <TITLE>
+# <CONTENT>
+# one line after 
+# all time is output in Europe/Stockholm timezone
+
+# <DATE>  2015-04-20 16:02:24 CEST
+# <TITLE>  Statistics of jobs added
+# <CONTENT>  Now you can browse statistics of jobs
+# 
+# 
+# <DATE>  2015-05-06 16:02:24 CEST
+# <TITLE>  Tab news added
+# <CONTENT>  Now you can browse statistics of jobs
+<DATE>  2015-10-30 12:26:34 CEST
+<TITLE>  Added SCAMPI-msa
+<CONTENT>  Now you are able to submit queries to run also SCMAPI-msa. However,
+due to the limitation of our computational resource, you are able to submit at
+most 3 sequences at a time.

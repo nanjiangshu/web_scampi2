@@ -1,0 +1,3 @@
+seq_0	250	seq1
+seq_1	142	seq2
+seq_2	271	seq3

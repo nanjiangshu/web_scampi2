@@ -1,0 +1,195 @@
+{% extends "pred/base_layout.html" %}
+
+{%block content_right_panel %}
+    {% if username %}
+      {% include "pred/user_header.html" %}
+    {% endif %}
+  <h2>Help</h2>
+  <table cellspacing=0 cellpadding=0 border=0>
+    <tr>
+      <td class="Greylink"><a href="#1">1.&nbsp;Summary<img src="{{STATIC_URL}}/images/0.gif" height=1 width=5 border=0><img src="{{STATIC_URL}}/images/arrow.png" border=0><img src="{{STATIC_URL}}/images/0.gif" height=1 width=40 border=0></a><td>
+      <td class="Greylink"><a href="#2">2.&nbsp;Usage<img src="{{STATIC_URL}}/images/0.gif" height=1 width=5 border=0><img src="{{STATIC_URL}}/images/arrow.png" border=0><img src="{{STATIC_URL}}/images/0.gif" height=1 width=40 border=0></a><td>
+      <td class="Greylink"><a href="#3">3.&nbsp;Output<img src="{{STATIC_URL}}/images/0.gif" height=1 width=5 border=0><img src="{{STATIC_URL}}/images/arrow.png" border=0><img src="{{STATIC_URL}}/images/0.gif" height=1 width=40 border=0></a><td>
+      <td class="Greylink"><a href="#4">4.&nbsp;References<img src="{{STATIC_URL}}/images/0.gif" height=1 width=5 border=0><img src="{{STATIC_URL}}/images/arrow.png" border=0><img src="{{STATIC_URL}}/images/0.gif" height=1 width=40 border=0></a><td>
+      <td class="Greylink"><a href="#5">5.&nbsp;Contact<img src="{{STATIC_URL}}/images/0.gif" height=1 width=5 border=0><img src="{{STATIC_URL}}/images/arrow.png" border=0><img src="{{STATIC_URL}}/images/0.gif" height=1 width=40 border=0></a><td>
+      </tr>
+  </table>
+
+  <table>
+    <tr>
+      <td valign="top" colspan="2">
+      <br><br>
+      <a name="1"></a>
+      <h3>1. Summary</h3><br>
+      <table cellspacing=0 cellpadding=0 border=0>
+        <tr>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td>
+        </tr>
+        <tr><td>
+            <p>
+            Given the amino acid sequence of a putative alpha-helical membrane
+            protein, SCAMPI predicts the topology of the protein, i.e. a
+            specification of the membrane spanning segments and their IN/OUT
+            orientation relative to the membrane. The prediction is based on an
+            experimentally determined scale of free energy contributions from
+            each amino acid to helix insertion efficiency. See the SCAMPI2 paper
+            for a detailed description of the method.
+
+            Note that the server does not predict cleavable signal peptides,
+            which are easily confused with TM segments. If signal peptides are
+            likely to be present in the input data, please use <a
+            href="http://topcons.net">TOPCONS</a>, which
+            predict also the signal peptide.
+            </p>
+
+            <p>
+            SCAMPI2 is supported by the <a href="https://www.egi.eu/services/cloud-compute/">EGI FedCloud</a> with the VO VO.NBIS.SE for computational resource. 
+            </p> 
+
+        </td> </tr>
+      </table>
+
+      <br><br>
+
+      <a name="2"></a>
+      <h3>2. Usage</h3><br>
+      <table cellspacing=0 cellpadding=0 border=0>
+        <tr>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td>
+        </tr>
+        <tr><td>
+            <p>
+            This server is appropriate for topology predictions of large
+            protein datasets. Input to the server is amino acid sequences in
+            FASTA format. Using the text window, the maximum number of
+            characters to be pasted is 100,000, or using the file upload option, the
+            maximum number of sequences per query is 100,000 (i.e. enough for
+            all bacterial and even most eukaryotic proteomes). If you only have
+            one or a few sequences, use the <a
+            href="http://topcons.net">TOPCONS</a> server instead.
+
+            </p>
+            <i>Example input:</i> <br>
+            <span style="font-family: courier">
+                &gt;sp|O93740|BACR_HALS4 Bacteriorhodopsin Halobacterium sp.<br>
+            MCCAALAPPMAATVGPESIWLWIGTIGMTLGTLYFVGRGRGVRDRKMQEFYIITIFITTI    <br>
+            AAAMYFAMATGFGVTEVMVGDEALTIYWARYADWLFTTPLLLLDLSLLAGANRNTIATLI    <br>
+            GLDVFMIGTGAIAALSSTPGTRIAWWAISTGALLALLYVLVGTLSENARNRAPEVASLFG    <br>
+            RLRNLVIALWFLYPVVWILGTEGTFGILPLYWETAAFMVLDLSAKVGFGVILLQSRSVLE    <br>
+            RVATPTAAPT                                                      <br>
+            &gt;sp|P69905|HBA_HUMAN Hemoglobin subunit alpha Homo sapiens   <br>
+            MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHG    <br>
+            KKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTP    <br>
+            AVHASLDKFLASVSTVLTSKYR                                          <br>
+            &gt;sp|P47865|AQP1_BOVIN Aquaporin-1 Bos taurus                 <br>
+            MASEFKKKLFWRAVVAEFLAMILFIFISIGSALGFHYPIKSNQTTGAVQDNVKVSLAFGL    <br>
+            SIATLAQSVGHISGAHLNPAVTLGLLLSCQISVLRAIMYIIAQCVGAIVATAILSGITSS    <br>
+            LPDNSLGLNALAPGVNSGQGLGIEIIGTLQLVLCVLATTDRRRRDLGGSGPLAIGFSVAL    <br>
+            GHLLAIDYTGCGINPARSFGSSVITHNFQDHWIFWVGPFIGAALAVLIYDFILAPRSSDL    <br>
+            TDRVKVWTSGQVEEYDLDADDINSRVEMKPK                                   <br>
+            &gt;sp|P62737|ACTA_MOUSE Actin, aortic smooth muscle Mus musculus <br>
+            MCEEEDSTALVCDNGSGLCKAGFAGDDAPRAVFPSIVGRPRHQGVMVGMGQKDSYVGDEA      <br>
+            QSKRGILTLKYPIEHGIITNWDDMEKIWHHSFYNELRVAPEEHPTLLTEAPLNPKANREK     <br>
+            MTQIMFETFNVPAMYVAIQAVLSLYASGRTTGIVLDSGDGVTHNVPIYEGYALPHAIMRL     <br>
+            DLAGRDLTDYLMKILTERGYSFVTTAEREIVRDIKEKLCYVALDFENEMATAASSSSLEK     <br>
+            SYELPDGQVITIGNERFRCPETLFQPSFIGMESAGIHETTYNSIMKCDIDIRKDLYANNV     <br>
+            LSGGTTMYPGIADRMQKEITALAPSTMKIKIIAPPERKYSVWIGGSILASLSTFQQMWIS     <br>
+            KQEYDEAGPSIVHRKCF                                                <br>
+            &gt;sp|P00803|LEP_ECOLI Signal peptidase I Escherichia coli      <br>
+            MANMFALILVIATLVTGILWCVDKFFFAPKRRERQAAAQAAAGDSLDKATLKKVAPKPGW     <br>
+            LETGASVFPVLAIVLIVRSFIYEPFQIPSGSMMPTLLIGDFILVEKFAYGIKDPIYQKTL     <br>
+            IETGHPKRGDIVVFKYPEDPKLDYIKRAVGLPGDKVTYDPVSKELTIQPGCSSGQACENA     <br>
+            LPVTYSNVEPSDFVQTFSRRNGGEATSGFFEVPKNETKENGIRLSERKETLGDVTHRILT     <br>
+            VPIAQDQVGMYYQQPGQQLATWIVPPGQYFMMGDNRDNSADSRYWGFVPEANLVGRATAI     <br>
+            WMSFDKQEGEWPTGLRLSRIGGIH                                         <br>
+            </span>
+            <br>
+      </td></tr>
+    </table>
+
+    <br><br>
+
+      <a name="3"></a>
+      <h3>3. Output</h3><br>
+      <table cellspacing=0 cellpadding=0 border=0>
+        <tr>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+          <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td></tr>
+        <tr><td>
+                <p>
+                The server outputs prediction results in three text files:
+
+                <ul>
+                    <li>Predicted topologies: Text file containing the predicted
+                topologies for all proteins in a FASTA-like format, where
+                i=inside (cytoplasmic side), M=membrane and o=outside
+                (extra-cytoplasmic side).</li>
+
+                <li>List of predicted TM proteins: A list containing the names of
+                all proteins with at least one predicted TM region.</li>
+
+                <li>List of predicted non-TM proteins: A list containing the names
+                of all proteins with no predicted TM regions.</li>
+                </ul>
+                </p>
+      </td></tr>
+    </table>
+    <br><br>
+
+    <a name="4"></a>
+
+    <h3>4. References</h3><br>
+    <table cellspacing=0 cellpadding=5 border=0>
+      <tr><td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+        <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td>
+     <tr><td>
+         <b>SCAMPI2:</b>
+         <br>
+         Improved topology predictions using the first and last hydrophobic
+         helix rule. Christoph Peters, Konstantinos D. Tsirigos, Nanjiang Shu,
+         Arne Elofsson [Submitted]
+     </td></tr>
+      <tr><td>
+          <b>SCAMPI:</b>
+          Prediction of membrane-protein topology from first principles. <br>
+          Bernsel A, Viklund H, Falk J, Lindahl E, von Heijne G and Elofsson A
+          (2008) Proc. Natl. Acad. Sci. USA. 105, 7177-7181. [<a
+            href="http://www.ncbi.nlm.nih.gov/pubmed/18477697">Pubmed</a>]
+      </td></tr>
+  </table>
+
+  <br><br>
+  <a name="5"></a>
+
+    <h3>5. Contact</h3><br
+    <table cellspacing=0 cellpadding=0 border=0>
+      <tr>
+        <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=400></td>
+        <td><img src="{{STATIC_URL}}/images/0.gif" border=0 height=1 width=50></td>
+      </tr>
+      <tr><td>
+          <b>Arne Elofsson group</b><br><br>
+          <!--<a href="http://www.cbr.su.se/">Center for Biomembrane Research</a><br><br>-->
+          <a href="http://www.dbb.su.se/">Department for Biochemistry and Biophysics</a><br>
+          The Arrhenius Laboratories for Natural Sciences<br>
+          <a href="http://www.su.se/">Stockholm University</a><br>
+          SE-106 91 Stockholm, Sweden<br><br>
+
+          <a href="http://www.scilifelab.se">Science for Life Laboratory</a><br>
+            Box 1031, 17121 Solna, Sweden
+            <br><br>
+          <table cellspacing=0 cellpadding=0 border=0>
+            <tr><td>E-mail:</td><td>&nbsp;&nbsp;&nbsp;</td><td><a href="mailto:arne@bioinfo.se">arne@bioinfo.se</a></td></tr>
+            <tr><td>Phone:</td><td>&nbsp;&nbsp;&nbsp;</td><td>(+46)-8-16&nbsp;4672</td></tr>
+            <tr><td>Fax:</td><td>&nbsp;&nbsp;&nbsp;</td><td>(+46)-8-15 3679</td></tr>
+          </table>
+          <br><br><br>
+    </td></tr>
+  </table>
+
+  </table>
+
+{% endblock %}
+

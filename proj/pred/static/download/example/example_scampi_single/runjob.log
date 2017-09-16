@@ -1,0 +1,7 @@
+tmpdir = /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_
+/big/server/var/www/web_scampi2/release/proj/pred/app/soft/scampi2/bin/scampi/SCAMPI_run.pl /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/query.fa /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/rst_jbOYjU/query.top
+/big/server/var/www/web_scampi2/release/proj/pred/app/soft/scampi2/bin/scampi/SCAMPI_run.pl /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/query.fa /big/server/var/www/web_scampi2/release/proj/pred/static/tmp/tmp_02X6B_/rst_jbOYjU/query.top
+workflow:
+generateFastaFromFile
+
+
