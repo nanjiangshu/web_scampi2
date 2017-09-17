@@ -260,14 +260,15 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                     myfunc.WriteFile("\t".join(info_finish)+"\n",
                             finished_seq_file, "a", isFlush=True)
 
-        all_end_time = time.time()
-        all_runtime_in_sec = all_end_time - all_begin_time
+    all_end_time = time.time()
+    all_runtime_in_sec = all_end_time - all_begin_time
 
-        if len(g_params['runjob_log']) > 0 :
-            rt_msg = myfunc.WriteFile("\n".join(g_params['runjob_log'])+"\n", runjob_logfile, "a")
-            if rt_msg:
-                g_params['runjob_err'].append(rt_msg)
+    if len(g_params['runjob_log']) > 0 :
+        rt_msg = myfunc.WriteFile("\n".join(g_params['runjob_log'])+"\n", runjob_logfile, "a")
+        if rt_msg:
+            g_params['runjob_err'].append(rt_msg)
 
+    if not g_params['isOnlyGetCache'] or len(toRunDict) == 0:
         datetime = time.strftime("%Y-%m-%d %H:%M:%S")
         if os.path.exists(finished_seq_file):
             rt_msg = myfunc.WriteFile(datetime, finishtagfile)
@@ -294,50 +295,52 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         os.chdir(pwd)
 
 
-    isSuccess = False
-    if (os.path.exists(finishtagfile) and os.path.exists(zipfile_fullpath)):
-        isSuccess = True
-        # delete the tmpdir if succeeded
-        shutil.rmtree(tmpdir) #DEBUG, keep tmpdir
-    else:
         isSuccess = False
-        failtagfile = "%s/runjob.failed"%(outpath)
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-        rt_msg = myfunc.WriteFile(datetime, failtagfile)
-        if rt_msg:
-            g_params['runjob_err'].append(rt_msg)
+        if (os.path.exists(finishtagfile) and os.path.exists(zipfile_fullpath)):
+            isSuccess = True
+            # delete the tmpdir if succeeded
+            shutil.rmtree(tmpdir) #DEBUG, keep tmpdir
+        else:
+            isSuccess = False
+            failtagfile = "%s/runjob.failed"%(outpath)
+            datetime = time.strftime("%Y-%m-%d %H:%M:%S")
+            rt_msg = myfunc.WriteFile(datetime, failtagfile)
+            if rt_msg:
+                g_params['runjob_err'].append(rt_msg)
 
 # send the result to email
 # do not sendmail at the cloud VM
-    if (g_params['base_www_url'].find("frag1d") != -1 and
-            myfunc.IsValidEmailAddress(email)):
-        from_email = "info@scampi.bioinfo.se"
-        to_email = email
-        subject = "Your result for SCAMPI2 JOBID=%s"%(jobid)
-        if isSuccess:
-            bodytext = """
-Your result is ready at %s/pred/result/%s
+        if (webserver_common.IsFrontEndNode(base_www_url) and
+                myfunc.IsValidEmailAddress(email)):
+            from_email = "info@scampi.bioinfo.se"
+            to_email = email
+            subject = "Your result for SCAMPI2 JOBID=%s"%(jobid)
+            if isSuccess:
+                bodytext = """
+    Your result is ready at %s/pred/result/%s
 
-Thanks for using SCAMPI2-msa
+    Thanks for using SCAMPI2-msa
 
-        """%(g_params['base_www_url'], jobid)
-        else:
-            bodytext="""
-We are sorry that your job with jobid %s is failed.
+            """%(g_params['base_www_url'], jobid)
+            else:
+                bodytext="""
+    We are sorry that your job with jobid %s is failed.
 
-Please contact %s if you have any questions.
+    Please contact %s if you have any questions.
 
-Attached below is the error message:
-%s
-            """%(jobid, contact_email, "\n".join(g_params['runjob_err']))
-        g_params['runjob_log'].append("Sendmail %s -> %s, %s"% (from_email, to_email, subject)) #debug
-        rtValue = myfunc.Sendmail(from_email, to_email, subject, bodytext)
-        if rtValue != 0:
-            g_params['runjob_err'].append("Sendmail to {} failed with status {}".format(to_email, rtValue))
+    Attached below is the error message:
+    %s
+                """%(jobid, contact_email, "\n".join(g_params['runjob_err']))
+            g_params['runjob_log'].append("Sendmail %s -> %s, %s"% (from_email, to_email, subject)) #debug
+            rtValue = myfunc.Sendmail(from_email, to_email, subject, bodytext)
+            if rtValue != 0:
+                g_params['runjob_err'].append("Sendmail to {} failed with status {}".format(to_email, rtValue))
+
 
     if len(g_params['runjob_err']) > 0:
         rt_msg = myfunc.WriteFile("\n".join(g_params['runjob_err'])+"\n", runjob_errfile, "w")
         return 1
+
     return 0
 #}}}
 def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
@@ -354,6 +357,8 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     resultpathname = jobid
 
     outpath_result = "%s/%s"%(outpath, resultpathname)
+    tmp_outpath_result = "%s/%s"%(tmpdir, resultpathname)
+
     tarball = "%s.tar.gz"%(resultpathname)
     zipfile = "%s.zip"%(resultpathname)
     tarball_fullpath = "%s.tar.gz"%(outpath_result)
@@ -362,8 +367,6 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     outfile = "%s/%s"%(outpath_result, "query.top")
 
 
-
-    tmp_outpath_result = "%s/%s"%(tmpdir, resultpathname)
     isOK = True
     try:
         os.makedirs(tmp_outpath_result)

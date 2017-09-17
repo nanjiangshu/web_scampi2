@@ -5,6 +5,7 @@
 import os
 import sys
 import site
+import sqlite3
 
 rundir = os.path.dirname(os.path.realpath(__file__))
 webserver_root = os.path.realpath("%s/../../../"%(rundir))
@@ -964,7 +965,7 @@ def GetResult(jobid):#{{{
                     "newrun", str(runtime), description, seq, top]
             myfunc.WriteFile("\t".join(info_finish)+"\n",
                     finished_seq_file, "a", isFlush=True)
-            myfunc.WriteFile("%d\n"%(cnt), finished_idx_file, "a", isFlush=True)
+            myfunc.WriteFile("%d\n"%(origIndex), finished_idx_file, "a", isFlush=True)
             finished_info_list.append("\t".join(info_finish))
             finished_idx_list.append(str(origIndex))
             #}}}
@@ -1043,7 +1044,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
 
         # Now write the text output to a single file
         statfile = "%s/%s"%(outpath_result, "stat.txt")
-        resultfile_text = "%s/%s"%(outpath_result, "query.result.txt")
+        resultfile_text = "%s/%s"%(outpath_result, "query.top")
         (seqIDList, seqAnnoList, seqList) = myfunc.ReadFasta(seqfile)
         maplist = []
         for i in xrange(len(seqIDList)):

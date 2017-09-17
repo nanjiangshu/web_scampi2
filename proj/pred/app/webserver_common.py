@@ -73,7 +73,11 @@ def WriteSubconsTextResultFile(outfile, outpath_result, maplist,#{{{
 def WriteSCAMPI2MSATextResultFile(outfile, outpath_result, maplist, #{{{
         runtime_in_sec, base_www_url, statfile=""):
     finished_seq_file = "%s/finished_seqs.txt"%(outpath_result)
+    TM_listfile = "%s/query.TM_list.txt"%(outpath_result)
+    nonTM_listfile = "%s/query.nonTM_list.txt"%(outpath_result)
     finish_info_lines = myfunc.ReadFile(finished_seq_file).split('\n')
+    str_TMlist = []
+    str_nonTMlist = []
     try:
         fpout = open(outfile, "w")
 
@@ -94,8 +98,11 @@ def WriteSCAMPI2MSATextResultFile(outfile, outpath_result, maplist, #{{{
                 fpout.write(">%s\n%s\n"%(desp, top))
                 numTM = myfunc.CountTM(top)
                 if numTM >0:
+                    str_TMlist.append(desp)
                     isTMPro = True
                     numTMPro += 1
+                else:
+                    str_nonTMlist.append(desp)
 
                 cnt += 1
 
@@ -103,6 +110,10 @@ def WriteSCAMPI2MSATextResultFile(outfile, outpath_result, maplist, #{{{
             out_str_list = ["numTMPro\t%d\n"%(numTMPro)]
             fpstat.write("%s"%("\n".join(out_str_list)))
             fpstat.close()
+
+        myfunc.WriteFile("\n".join(str_TMlist), TM_listfile, "w")
+        myfunc.WriteFile("\n".join(str_nonTMlist), nonTM_listfile, "w")
+
     except IOError:
         print "Failed to write to file %s"%(outfile)
 #}}}
