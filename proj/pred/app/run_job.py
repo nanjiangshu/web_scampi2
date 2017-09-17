@@ -101,6 +101,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     resultfile_text = "%s/%s"%(outpath_result, "query.result.txt")
     mapfile = "%s/seqid_index_map.txt"%(outpath_result)
     finished_seq_file = "%s/finished_seqs.txt"%(outpath_result)
+    finished_idx_file = "%s/finished_seqindex.txt"%(rstdir)
 
     for folder in [outpath_result, tmp_outpath_result]:
         try:
@@ -136,29 +137,30 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                 if not g_params['isForceRun']:
                     md5_key = hashlib.md5(rd.seq).hexdigest()
                     con = sqlite3.connect(dbname)
-                        with con:
-                            cur = con.cursor()
-                            cur.execute("""
-                                CREATE TABLE IF NOT EXISTS %s
-                                (
-                                    md5 VARCHAR(100),
-                                    seq VARCHAR(30000),
-                                    top VARCHAR(30000),
-                                    PRIMARY KEY (md5)
-                                )"""%(dbmsa_tablename))
-                                cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
-                                        dbmsa_tablename, md5)
-                                cur.execute(cmd)
-                                rows = cur.fetchall()
-                                for row in rows:
-                                    top = row[2]
-                                    numTM = myfunc.CountTM(top)
-                                    # info_finish has 8 items
-                                    info_finish = [ "seq_%d"%cnt, str(len(rd.seq)), str(numTM),
-                                            "cached", str(0.0), rd.description, rd.seq, top]
-                                    myfunc.WriteFile("\t".join(info_finish)+"\n",
-                                            finished_seq_file, "a", isFlush=True)
-                                    isSkip = True
+                    with con:
+                        cur = con.cursor()
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS %s
+                            (
+                                md5 VARCHAR(100),
+                                seq VARCHAR(30000),
+                                top VARCHAR(30000),
+                                PRIMARY KEY (md5)
+                            )"""%(dbmsa_tablename))
+                        cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
+                                dbmsa_tablename, md5_key)
+                        cur.execute(cmd)
+                        rows = cur.fetchall()
+                        for row in rows:
+                            top = row[2]
+                            numTM = myfunc.CountTM(top)
+                            # info_finish has 8 items
+                            info_finish = [ "seq_%d"%cnt, str(len(rd.seq)), str(numTM),
+                                    "cached", str(0.0), rd.description, rd.seq, top]
+                            myfunc.WriteFile("\t".join(info_finish)+"\n",
+                                    finished_seq_file, "a", isFlush=True)
+                            myfunc.WriteFile("%d\n"%(cnt), finished_idx_file, "a", isFlush=True)
+                            isSkip = True
 
                 if not isSkip:
                     # first try to delete the outfolder if exists
@@ -314,7 +316,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             bodytext = """
 Your result is ready at %s/pred/result/%s
 
-Thanks for using SCAMPI-msa
+Thanks for using SCAMPI2-msa
 
         """%(g_params['base_www_url'], jobid)
         else:
@@ -442,7 +444,7 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     if myfunc.IsValidEmailAddress(email):
         from_email = "info@scampi.bioinfo.se"
         to_email = email
-        subject = "Your result for scampi2 JOBID=%s"%(jobid)
+        subject = "Your result for SCAMPI2 JOBID=%s"%(jobid)
         if isSuccess:
             bodytext = """
 Your result is ready at %s/pred/result/%s
@@ -563,6 +565,7 @@ def InitGlobalParameter():#{{{
     g_params['runjob_log'] = []
     g_params['runjob_err'] = []
     g_params['isForceRun'] = False
+    g_params['isOnlyGetCache'] = False
     g_params['base_www_url'] = ""
     g_params['app_type'] = "SCAMPI-single"
     return g_params

@@ -18,13 +18,13 @@ progname =  os.path.basename(__file__)
 wspace = ''.join([" "]*len(progname))
 
 vip_user_list = [
-        "kostas.tsirigos@scilifelab.se",
         "nanjiang.shu@scilifelab.se"
         ]
 
 rundir = os.path.dirname(os.path.realpath(__file__))
 basedir = os.path.realpath("%s/../"%(rundir))
 python_exec = os.path.realpath("%s/../../env/bin/python"%(basedir))
+virt_env_path = os.path.realpath("%s/../../env"%(basedir))
 suq_basedir = "/tmp"
 if os.path.exists("/scratch"):
     suq_basedir = "/scratch"
@@ -100,10 +100,12 @@ def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, 
     if numseq_this_user == -1:
         numseq_this_user = numseq
 
+    name_software = app_type
     runjob = "%s %s/run_job.py"%(python_exec, rundir)
-    scriptfile = "%s/runjobSPLIT%sSPLIT%sSPLIT%sSPLIT%d.sh"%(datapath, jobid, host_ip, email, numseq)
+    scriptfile = "%s/runjob;%s;%s;%s;%s;%d.sh"%(outpath, name_software, jobid, host_ip, email, numseq)
     code_str_list = []
     code_str_list.append("#!/bin/bash")
+    code_str_list.append("source %s/bin/activate"%(virt_env_path))
     cmdline = "%s %s -outpath %s -tmpdir %s -jobid %s "%(runjob, fafile, outpath, datapath, jobid)
     if email != "":
         cmdline += "-email \"%s\" "%(email)
@@ -133,14 +135,14 @@ def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, 
 
     myfunc.WriteFile("priority=%d\n"%(priority), g_params['debugfile'], "a")
 
-    st1 = SubmitSuqJob(suq_basedir, datapath, priority, scriptfile)
+    st1 = SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile)
 
     return st1
 #}}}
-def SubmitSuqJob(suq_basedir, datapath, priority, scriptfile):#{{{
+def SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile):#{{{
     myfunc.WriteFile("Entering SubmitSuqJob()\n", g_params['debugfile'], "a")
     rmsg = ""
-    cmd = [suq_exec,"-b", suq_basedir, "run", "-d", datapath, "-p", "%d"%(priority), scriptfile]
+    cmd = [suq_exec,"-b", suq_basedir, "run", "-d", outpath, "-p", "%d"%(priority), scriptfile]
     cmdline = " ".join(cmd)
     myfunc.WriteFile("cmdline: %s\n\n"%(cmdline), g_params['debugfile'], "a")
     MAX_TRY = 5
@@ -270,6 +272,7 @@ def InitGlobalParameter():#{{{
     g_params = {}
     g_params['isQuiet'] = True
     g_params['isForceRun'] = False
+    g_params['isOnlyGetCache'] = False
     g_params['fperr'] = None
     return g_params
 #}}}

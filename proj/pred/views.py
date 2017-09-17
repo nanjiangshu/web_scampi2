@@ -59,7 +59,7 @@ sys.path.append(path_app)
 path_log = "%s/static/log"%(SITE_ROOT)
 gen_logfile = "%s/static/log/%s.log"%(SITE_ROOT, progname)
 MAX_ALLOWD_NUMSEQ_single = 100000
-MAX_ALLOWD_NUMSEQ_msa = 3
+MAX_ALLOWD_NUMSEQ_msa = 10
 MIN_LEN_SEQ=5
 MAX_LEN_SEQ=10000
 path_result = "%s/static/result"%(SITE_ROOT)
@@ -275,17 +275,11 @@ def submit_seq(request):#{{{
                 query['BASEURL'] = BASEURL
 
                 # start the qd_fe if not, in the background
-#                 cmd = [qd_fe_scriptfile]
+                cmd = [qd_fe_scriptfile]
                 base_www_url = "http://" + request.META['HTTP_HOST']
                 if base_www_url.find("scampi.bioinfo.se") != -1: #run the daemon only at the frontend
                     cmd = "nohup python %s &"%(qd_fe_scriptfile)
                     os.system(cmd)
-#                 try:
-#                     subprocess.check_output(cmd)
-#                 except subprocess.CalledProcessError, e:
-#                     datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-#                     myfunc.WriteFile("[%s] %s\n"%(datetime, str(e)), gen_errfile, "a")
-
 
                 if query['numseq'] < 0: #go to result page anyway
                     query['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
@@ -2119,15 +2113,15 @@ def get_results(request, jobid="1"):#{{{
     if numseq <= 1:
         if method_submission == "web":
             if app_type == "SCAMPI-single":
-                resultdict['refresh_interval'] = 0.5
+                resultdict['refresh_interval'] = 1
             else:
-                resultdict['refresh_interval'] = 2
+                resultdict['refresh_interval'] = 5.0
 
         else:
             if app_type == "SCAMPI-single":
-                resultdict['refresh_interval'] = 0.5
+                resultdict['refresh_interval'] = 1.0
             else:
-                resultdict['refresh_interval'] = 2
+                resultdict['refresh_interval'] = 5.0
     else:
         #resultdict['refresh_interval'] = numseq * 2
         addtime = int(math.sqrt(max(0,min(num_remain, num_finished))))
