@@ -1522,109 +1522,6 @@ def get_reference(request):#{{{
     return render(request, 'pred/reference.html', info)
 #}}}
 
-def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
-        finishedjoblogfile, loop):
-    myfunc.WriteFile("CreateRunJoblog...\n", gen_logfile, "a", True)
-    # Read entries from submitjoblogfile, checking in the result folder and
-    # generate two logfiles: 
-    #   1. runjoblogfile 
-    #   2. finishedjoblogfile
-    # when loop == 0, for unfinished jobs, re-generate finished_seqs.txt
-    hdl = myfunc.ReadLineByBlock(submitjoblogfile)
-    if hdl.failure:
-        return 1
-
-    finished_jobid_list = []
-    finished_job_dict = {}
-    if os.path.exists(finishedjoblogfile):
-        finished_job_dict = myfunc.ReadFinishedJobLog(finishedjoblogfile)
-
-    new_finished_list = []  # Finished or Failed
-    new_runjob_list = []    # Running
-    new_waitjob_list = []    # Queued
-    lines = hdl.readlines()
-    while lines != None:
-        for line in lines:
-            strs = line.split("\t")
-            if len(strs) < 8:
-                continue
-            submit_date_str = strs[0]
-            jobid = strs[1]
-            ip = strs[2]
-            numseq_str = strs[3]
-            jobname = strs[5]
-            email = strs[6].strip()
-            method_submission = strs[7]
-            start_date_str = ""
-            finish_date_str = ""
-            rstdir = "%s/%s"%(path_result, jobid)
-
-            numseq = 1
-            try:
-                numseq = int(numseq_str)
-            except:
-                pass
-
-            if jobid in finished_job_dict:
-                if os.path.exists(rstdir):
-                    li = [jobid] + finished_job_dict[jobid]
-                    new_finished_list.append(li)
-                continue
-
-
-            status = get_job_status(jobid)
-
-            starttagfile = "%s/%s"%(rstdir, "runjob.start")
-            finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
-            if os.path.exists(starttagfile):
-                start_date_str = myfunc.ReadFile(starttagfile).strip()
-            if os.path.exists(finishtagfile):
-                finish_date_str = myfunc.ReadFile(finishtagfile).strip()
-
-            li = [jobid, status, jobname, ip, email, numseq_str,
-                    method_submission, submit_date_str, start_date_str,
-                    finish_date_str]
-            if status in ["Finished", "Failed"]:
-                new_finished_list.append(li)
-
-            # single-sequence job submitted from the web-page will be
-            # submmitted by suq
-            if numseq > 1 or method_submission == "wsdl":
-                if status == "Running":
-                    new_runjob_list.append(li)
-                elif status == "Wait":
-                    new_waitjob_list.append(li)
-        lines = hdl.readlines()
-    hdl.close()
-
-# re-write logs of finished jobs
-    li_str = []
-    for li in new_finished_list:
-        li_str.append("\t".join(li))
-    if len(li_str)>0:
-        myfunc.WriteFile("\n".join(li_str)+"\n", finishedjoblogfile, "w", True)
-    else:
-        myfunc.WriteFile("", finishedjoblogfile, "w", True)
-# re-write logs of finished jobs for each IP
-    new_finished_dict = {}
-    for li in new_finished_list:
-        ip = li[3]
-        if not ip in new_finished_dict:
-            new_finished_dict[ip] = []
-        new_finished_dict[ip].append(li)
-    for ip in new_finished_dict:
-        finished_list_for_this_ip = new_finished_dict[ip]
-        divide_finishedjoblogfile = "%s/divided/%s_finished_job.log"%(path_log,
-                ip)
-        li_str = []
-        for li in finished_list_for_this_ip:
-            li_str.append("\t".join(li))
-        if len(li_str)>0:
-            myfunc.WriteFile("\n".join(li_str)+"\n", divide_finishedjoblogfile, "w", True)
-        else:
-            myfunc.WriteFile("", divide_finishedjoblogfile, "w", True)
-
-#}}}
 
 def get_serverstatus(request):#{{{
     info = {}
@@ -1657,8 +1554,6 @@ def get_serverstatus(request):#{{{
     runjoblogfile = "%s/runjob_log.log"%(path_log)
     finishedjoblogfile = "%s/finished_job.log"%(path_log)
     loop = 1
-    CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,
-            finishedjoblogfile, loop)
 
 # finished sequences submitted by wsdl
 # finished sequences submitted by web

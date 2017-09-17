@@ -56,7 +56,6 @@ except IOError:
 contact_email = "nanjiang.shu@scilifelab.se"
 
 threshold_logfilesize = 20*1024*1024
-dbmsa_tablename = "scampi2msa"
 
 usage_short="""
 Usage: %s
@@ -86,6 +85,8 @@ path_cache = "%s/static/result/cache"%(basedir)
 # each line is a record and contains two items
 # hostname MAX_ALLOWED_PARALLEL_JOBS
 computenodefile = "%s/config/computenode.txt"%(basedir)
+db_cache_SCAMPI2MSA = "%s/cache_msa.sqlite3"%(path_result)
+dbmsa_tablename = "scampi2msa"
 
 gen_errfile = "%s/static/log/%s.err"%(basedir, progname)
 gen_logfile = "%s/static/log/%s.log"%(basedir, progname)
@@ -904,7 +905,7 @@ def GetResult(jobid):#{{{
                                 md5_key = hashlib.md5(seq).hexdigest()
                                 predfile = "%s/query.top"%( outpath_this_seq)
                                 (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
-                                con = sqlite3.connect(dbname)
+                                con = sqlite3.connect(db_cache_SCAMPI2MSA)
                                 with con:
                                     cur = con.cursor()
                                     cur.execute("""
@@ -915,7 +916,7 @@ def GetResult(jobid):#{{{
                                             top VARCHAR(30000),
                                             PRIMARY KEY (md5)
                                         )"""%(dbmsa_tablename))
-                                    cmd =  "INSERT OR IGNORE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(tablename, md5_key, seq, top)
+                                    cmd =  "INSERT OR IGNORE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
                                     cur.execute(cmd)
 
 #}}}

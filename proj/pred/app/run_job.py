@@ -94,6 +94,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     resultpathname = jobid
 
     outpath_result = "%s/%s"%(outpath, resultpathname)
+    tmp_outpath_result = "%s/%s"%(tmpdir, resultpathname)
+
     tarball = "%s.tar.gz"%(resultpathname)
     zipfile = "%s.zip"%(resultpathname)
     tarball_fullpath = "%s.tar.gz"%(outpath_result)
@@ -101,7 +103,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     resultfile_text = "%s/%s"%(outpath_result, "query.result.txt")
     mapfile = "%s/seqid_index_map.txt"%(outpath_result)
     finished_seq_file = "%s/finished_seqs.txt"%(outpath_result)
-    finished_idx_file = "%s/finished_seqindex.txt"%(rstdir)
+    finished_idx_file = "%s/finished_seqindex.txt"%(outpath)
 
     for folder in [outpath_result, tmp_outpath_result]:
         try:
@@ -136,7 +138,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                 isSkip = False
                 if not g_params['isForceRun']:
                     md5_key = hashlib.md5(rd.seq).hexdigest()
-                    con = sqlite3.connect(dbname)
+                    con = sqlite3.connect(db_cache_SCAMPI2MSA)
                     with con:
                         cur = con.cursor()
                         cur.execute("""
