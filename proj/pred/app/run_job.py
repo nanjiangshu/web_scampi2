@@ -184,13 +184,10 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             dumplist.append(">%s\n%s"%(str(key), top))
         myfunc.WriteFile("\n".join(dumplist)+"\n", torun_all_seqfile, "w")
         del dumplist
-
         sortedlist = sorted(toRunDict.items(), key=lambda x:x[1][1], reverse=True)
         #format of sortedlist [(origIndex: [seq, numTM, description]), ...]
-
         # submit sequences one by one to the workflow according to orders in
         # sortedlist
-
         for item in sortedlist:
             origIndex = item[0]
             seq = item[1][0]
