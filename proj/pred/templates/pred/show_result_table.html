@@ -1,0 +1,22 @@
+
+<table class="sortable" id="jobtable" align="left">
+    <thead>
+        <tr>
+            {% for hd in index_table_header %}
+            <th>{{hd}}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for record in index_table_content_list %}
+    <tr>
+        <td>{{record.0}}</td>
+        <td>{{record.1}}</td>
+        <td>{{record.2}}</td>
+        <td>{{record.3}}</td>
+        <td>{{record.4}}</td>
+        <td>{{record.5}}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
