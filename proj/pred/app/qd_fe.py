@@ -254,8 +254,8 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             jobinfo = myfunc.ReadFile(jobinfofile).strip()
             jobinfolist = jobinfo.split("\t")
             app_type = "None"
-            if len(jobinfolist) >= 8:
-                app_type = jobinfolist[7]
+            if len(jobinfolist) >= 9:
+                app_type = jobinfolist[8]
 
             li = [jobid, status, jobname, ip, email, numseq_str,
                     method_submission, submit_date_str, start_date_str,
