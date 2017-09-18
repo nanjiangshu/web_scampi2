@@ -1596,7 +1596,7 @@ def get_serverstatus(request):#{{{
             numseq = 1
         app_type = ""
         try:
-            app_type = li[10]
+            app_type = li[9]
         except:
             pass
 
