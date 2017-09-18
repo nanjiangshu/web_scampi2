@@ -12,24 +12,7 @@
 function readfile() {
     document.getElementById('iframe').contentDocument.body.firstChild.innerHTML;
 }
-{#
-{% if not isFinished  and not isFailed %}
-    setInterval(function(){$("#content_right_panel").load("{{url_result}}")},1000);
-{%endif%}
 {% endblock %}
-#}
-
-{# url: '{% url "pred.views.get_results"  jobid %}',#}
-
-{#    setInterval(function(){                                         #}
-{#          $.ajax({                                                  #}
-{#                url: '{% url "pred.views.get_results"  jobid %}',   #}
-{#                success: function(data) {                           #}
-{#                  alert('test');                                    #}
-{#                  $('#content_right_panel').html(data);             #}
-{#                }                                                   #}
-{#          });                                                       #}
-{#    }, 200)                                                         #}
 
 {%block content_right_panel %}
     {% if username %}
@@ -71,6 +54,18 @@ function readfile() {
                 The sequence(s) you submitted can be found in 
                 <a href="{{STATIC_URL}}result/{{jobid}}/{{raw_query_seqfile}}">{{raw_query_seqfile}}</a>
             </p>
+            {% if app_type == "SCAMPI-msa" and numseq > 1%}
+                <p>
+                    <b>Progress: {{num_finished}} / {{numseq}} ({{percent_finished}} %)
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+                        Estimated remaining time: {{time_remain}}</b>
+                </p>
+                <p>
+                Topology of already finished sequences: <a href="{{STATIC_URL}}result/{{jobid}}/{{jobid}}/query.part.top">query.part.top</a>
+                </p>
+                <hr>
+                {% include "pred/show_result_table.html"%}
+            {% endif %}
             <h4>Error message of the job</h4>
             <pre>
 {{errinfo}}
@@ -116,7 +111,7 @@ function readfile() {
             </p>
             <hr>
             {% if numseq > 1 %}
-                <table  align="left" cellspacing="1" cellpadding="1">
+                <table  width="100%" align="center" cellspacing="1" cellpadding="1">
                     <tr>
                         <td>Total number of protein sequences:</td>
                         <td>{{numseq}}</td>
@@ -137,9 +132,11 @@ function readfile() {
                     <tr></tr>
                 </table>
                 <br>
-
+                <hr>
+                {% if app_type == "SCAMPI-msa" %}
+                    {% include "pred/show_result_table.html"%}
+                {%endif%}
             {% else %}
-            {#{% include "pred/show_topoinfo.html"%}#}
             {%endif%}
         {% else %}
             Result for {{ jobid }} is not finished yet
@@ -177,6 +174,11 @@ function readfile() {
                         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
                         Estimated remaining time: {{time_remain}}</b>
                 </p>
+                <p>
+                Topology of already finished sequences: <a href="{{STATIC_URL}}result/{{jobid}}/{{jobid}}/query.part.top">query.part.top</a>
+                </p>
+                <hr>
+                {% include "pred/show_result_table.html"%}
             {% endif %}
 
         {% endif %}

@@ -59,7 +59,7 @@ sys.path.append(path_app)
 path_log = "%s/static/log"%(SITE_ROOT)
 gen_logfile = "%s/static/log/%s.log"%(SITE_ROOT, progname)
 MAX_ALLOWD_NUMSEQ_single = 100000
-MAX_ALLOWD_NUMSEQ_msa = 10
+MAX_ALLOWD_NUMSEQ_msa = 2000
 MIN_LEN_SEQ=5
 MAX_LEN_SEQ=10000
 path_result = "%s/static/result"%(SITE_ROOT)
@@ -1770,6 +1770,7 @@ def get_results(request, jobid="1"):#{{{
     statfile = "%s/%s/stat.txt"%(rstdir, jobid)
     method_submission = "web"
     finished_seq_file = "%s/%s/finished_seqs.txt"%(rstdir, jobid)
+    part_predfile = "%s/%s/query.part.top"%(rstdir, jobid)
 
     jobinfofile = "%s/jobinfo"%(rstdir)
     jobinfo = myfunc.ReadFile(jobinfofile).strip()
@@ -1917,37 +1918,40 @@ def get_results(request, jobid="1"):#{{{
     num_finished = 0
     cntnewrun = 0
     cntcached = 0
+    topcontentList = []
 # get seqid_index_map
     if os.path.exists(finished_seq_file):
         resultdict['index_table_header'] = ["No.", "Length", "numTM",
-                "SignalPeptide", "RunTime(s)", "SequenceName", "Source" ]
+                "RunTime(s)", "SequenceName", "Source" ]
         index_table_content_list = []
         indexmap_content = myfunc.ReadFile(finished_seq_file).split("\n")
         cnt = 0
+        added_idx_set = set([])
         for line in indexmap_content:
             strs = line.split("\t")
-            if len(strs)>=7:
+            if len(strs)>=8:
                 subfolder = strs[0]
-                length_str = strs[1]
-                numTM_str = strs[2]
-                isHasSP = "No"
-                if strs[3] == "True":
-                    isHasSP = "Yes"
-                source = strs[4]
-                try:
-                    runtime_in_sec_str = "%.1f"%(float(strs[5]))
-                    if source == "newrun":
-                        sum_run_time += float(strs[5])
-                        cntnewrun += 1
-                    elif source == "cached":
-                        cntcached += 1
-                except:
-                    runtime_in_sec_str = ""
-                desp = strs[6]
-                rank = "%d"%(cnt+1)
-                index_table_content_list.append([rank, length_str, numTM_str,
-                    isHasSP, runtime_in_sec_str, desp[:30], subfolder, source])
-                cnt += 1
+                if not subfolder in added_idx_set:
+                    length_str = strs[1]
+                    numTM_str = strs[2]
+                    source = strs[3]
+                    try:
+                        runtime_in_sec_str = "%.1f"%(float(strs[4]))
+                        if source == "newrun":
+                            sum_run_time += float(strs[4])
+                            cntnewrun += 1
+                        elif source == "cached":
+                            cntcached += 1
+                    except:
+                        runtime_in_sec_str = ""
+                    desp = strs[5]
+                    top = strs[7]
+                    rank = "%d"%(cnt+1)
+                    index_table_content_list.append([rank, length_str, numTM_str,
+                        runtime_in_sec_str, desp[:30],  source])
+                    cnt += 1
+                    added_idx_set.add(subfolder)
+                    topcontentList.append(">%s\n%s"%(desp,top))
         if cntnewrun > 0:
             average_run_time_msa = sum_run_time / cntnewrun
 
@@ -1956,22 +1960,6 @@ def get_results(request, jobid="1"):#{{{
         resultdict['num_finished'] = cnt
         num_finished = cnt
         resultdict['percent_finished'] = "%.1f"%(float(cnt)/numseq*100)
-    elif os.path.exists(seqid_index_mapfile):
-        resultdict['index_table_header'] = ["No.", "Length","SequenceName"]
-        index_table_content_list = []
-        indexmap_content = myfunc.ReadFile(seqid_index_mapfile).split("\n")
-        cnt = 0
-        for line in indexmap_content:
-            strs = line.split("\t")
-            if len(strs)>=3:
-                subfolder = strs[0]
-                length_str = strs[1]
-                desp = strs[2]
-                rank = "%d"%(cnt+1)
-                index_table_content_list.append([rank, length_str, desp[:60], subfolder])
-                cnt += 1
-        resultdict['index_table_content_list'] = index_table_content_list
-        resultdict['indexfiletype'] = "indexmap"
     else:
         resultdict['index_table_header'] = []
         resultdict['index_table_content_list'] = []
@@ -1980,6 +1968,7 @@ def get_results(request, jobid="1"):#{{{
         resultdict['percent_finished'] = "%.1f"%(0.0)
 
     num_remain = numseq - num_finished
+    myfunc.WriteFile("\n".join(topcontentList), part_predfile, "w")
 
     time_remain_in_sec = numseq * 120 # set default value
 
@@ -2069,6 +2058,7 @@ def get_results(request, jobid="1"):#{{{
 
     avg_lenseq = myfunc.FloatDivision(sum(lenseq_list), len(lenseq_list))
     resultdict['avg_lenseq'] = int(avg_lenseq+0.5)
+    resultdict['app_type'] = app_type
     resultdict['num_TMPro'] = num_TMPro
     resultdict['per_TMPro'] = "%.1f"%(myfunc.FloatDivision(num_TMPro, numseq)*100)
     resultdict['num_nonTMPro'] = numseq - num_TMPro
