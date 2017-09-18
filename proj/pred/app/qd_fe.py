@@ -250,9 +250,16 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             if os.path.exists(finishtagfile):
                 finish_date_str = myfunc.ReadFile(finishtagfile).strip()
 
+            jobinfofile = "%s/jobinfo"%(rstdir)
+            jobinfo = myfunc.ReadFile(jobinfofile).strip()
+            jobinfolist = jobinfo.split("\t")
+            app_type = "None"
+            if len(jobinfolist) >= 8:
+                app_type = jobinfolist[7]
+
             li = [jobid, status, jobname, ip, email, numseq_str,
                     method_submission, submit_date_str, start_date_str,
-                    finish_date_str]
+                    finish_date_str, app_type]
             if status in ["Finished", "Failed"]:
                 new_finished_list.append(li)
 
