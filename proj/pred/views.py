@@ -1577,12 +1577,14 @@ def get_serverstatus(request):#{{{
         myfunc.WriteFile("[%s] %s\n"%(datetime, str(e)), gen_errfile, "a")
 
 # get number of finished seqs
-    finishedjoblogfile = "%s/finished_job.log"%(path_log)
+    finishedjoblogfile = "%s/all_finished_job.log"%(path_log)
     finished_job_dict = {}
     if os.path.exists(finishedjoblogfile):
         finished_job_dict = myfunc.ReadFinishedJobLog(finishedjoblogfile)
 # editing here 2015-05-13
 
+    total_num_finished_seq_single = 0
+    total_num_finished_seq_msa = 0
     total_num_finished_seq = 0
     startdate = ""
     submitdatelist = []
@@ -1592,10 +1594,20 @@ def get_serverstatus(request):#{{{
             numseq = int(li[4])
         except:
             numseq = 1
+        app_type = ""
+        try:
+            app_type = li[10]
+        except:
+            pass
+
         try:
             submitdatelist.append(li[6])
         except:
             pass
+        if app_type == "SCAMPI-single":
+            total_num_finished_seq_single += numseq
+        elif app_type == "SCAMPI-msa":
+            total_num_finished_seq_msa += numseq
         total_num_finished_seq += numseq
 
     submitdatelist = sorted(submitdatelist, reverse=False)
@@ -1605,6 +1617,8 @@ def get_serverstatus(request):#{{{
 
     info['num_seq_in_local_queue'] = num_seq_in_local_queue
     info['total_num_finished_seq'] = total_num_finished_seq
+    info['total_num_finished_seq_msa'] = total_num_finished_seq_msa
+    info['total_num_finished_seq_single'] = total_num_finished_seq_single
     info['num_finished_seqs_str'] = str(total_num_finished_seq)
     info['startdate'] = startdate
     info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
