@@ -917,8 +917,10 @@ def GetResult(jobid):#{{{
                                             top VARCHAR(30000),
                                             PRIMARY KEY (md5)
                                         )"""%(dbmsa_tablename))
-                                    cmd =  "INSERT OR IGNORE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
+                                    cmd =  "INSERT OR REPLACE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
                                     cur.execute(cmd)
+
+                                shutil.rmtree(outpath_this_seq)
 
 #}}}
                 elif status in ["Failed", "None"]:
