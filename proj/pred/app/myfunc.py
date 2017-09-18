@@ -2250,9 +2250,12 @@ def ReadFinishedJobLog(infile, status=""):#{{{
                         submit_date_str = strs[7]
                         start_date_str = strs[8]
                         finish_date_str = strs[9]
+                        app_type = "None"
+                        if len(strs) >= 11:
+                            app_type = strs[10]
                         dt[jobid] = [status_this_job, jobname, ip, email,
                                 numseq_str, method_submission, submit_date_str,
-                                start_date_str, finish_date_str]
+                                start_date_str, finish_date_str, app_type]
             lines = hdl.readlines()
         hdl.close()
 
