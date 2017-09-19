@@ -2008,7 +2008,7 @@ def get_results(request, jobid="1"):#{{{
 
     time_remain = myfunc.second_to_human(time_remain_in_sec)
     resultdict['time_remain'] = time_remain
-
+    qdinittagfile = "%s/runjob.qdinit"%(rstdir)
 
     if numseq <= 1:
         if method_submission == "web":
@@ -2026,12 +2026,15 @@ def get_results(request, jobid="1"):#{{{
         #resultdict['refresh_interval'] = numseq * 2
         addtime = int(math.sqrt(max(0,min(num_remain, num_finished))))
         if app_type == "SCAMPI-single":
-            resultdict['refresh_interval'] = average_run_time_single + addtime
+            resultdict['refresh_interval'] = numseq * average_run_time_single
         else:
-            if num_finished == 0:
-                resultdict['refresh_interval'] = 5
+            if not os.path.exists(qdinittagfile):
+                resultdict['refresh_interval'] = 2
             else:
-                resultdict['refresh_interval'] = average_run_time_msa + addtime
+                if num_finished == 0:
+                    resultdict['refresh_interval'] = 5
+                else:
+                    resultdict['refresh_interval'] = 10 + addtime
 
     # get stat info
     if os.path.exists(statfile):#{{{
