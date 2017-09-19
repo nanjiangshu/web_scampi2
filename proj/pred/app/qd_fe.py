@@ -227,6 +227,8 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             start_date_str = ""
             finish_date_str = ""
             rstdir = "%s/%s"%(path_result, jobid)
+            if not os.path.exists(rstdir):
+                continue
 
             numseq = 1
             try:
@@ -558,7 +560,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                                 "cached", str(0.0), description, seq, top]
                         myfunc.WriteFile("\t".join(info_finish)+"\n",
                                 finished_seq_file, "a", isFlush=True)
-                        myfunc.WriteFile("%d\n"%(cnt), finished_idx_file, "a", isFlush=True)
+                        myfunc.WriteFile("%d\n"%(i), finished_idx_file, "a", isFlush=True)
                         isSkip = True
                     if not isSkip:
                         toRunDict[i] = [seqList[i], 0, seqAnnoList[i]] #init value for numTM is 0
