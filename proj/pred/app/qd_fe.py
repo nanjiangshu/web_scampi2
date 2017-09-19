@@ -244,6 +244,8 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
 
 
             status = get_job_status(jobid)
+            if g_params['DEBUG']:
+                myfunc.WriteFile("DEBUG: %s status=%s\n"%(jobid, status), gen_logfile, "a", True)
 
             starttagfile = "%s/%s"%(rstdir, "runjob.start")
             finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
@@ -281,7 +283,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             else:
                 queuetime_in_sec = UPPER_WAIT_TIME_IN_SEC + 1
 
-            if numseq > 1 or method_submission == "wsdl" or queuetime_in_sec > UPPER_WAIT_TIME_IN_SEC:
+            if numseq >= 1 or method_submission == "wsdl" or queuetime_in_sec > UPPER_WAIT_TIME_IN_SEC:
                 if status == "Running":
                     new_runjob_list.append(li)
                 elif status == "Wait":
@@ -506,8 +508,10 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
     # 1. generate a file with sorted seqindex
     # 2. generate splitted sequence files named by the original seqindex
     if not os.path.exists(qdinittagfile): #initialization#{{{
-        date_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+        date_str = time.strftime("%Y-%m-%d %H:%M:%S")
         myfunc.WriteFile(date_str, qdinit_start_tagfile, "w", True)
+        if not os.path.exists(starttagfile):
+            myfunc.WriteFile(date_str, starttagfile, "w", True)
         if not os.path.exists(tmpdir):
             os.mkdir(tmpdir)
 
@@ -1083,9 +1087,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         if base_www_url == "":
             base_www_url = "http://scampi.bioinfo.se"
 
-        date_str = time.strftime("%Y-%m-%d %H:%M:%S")
         date_str_epoch = time.time()
-        myfunc.WriteFile(date_str, finishtagfile, "w", True)
 
         # Now write the text output to a single file
         statfile = "%s/%s"%(outpath_result, "stat.txt")
@@ -1114,11 +1116,15 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
             myfunc.WriteFile(str(e)+"\n", errfile, "a", True)
             pass
 
+        date_str = time.strftime("%Y-%m-%d %H:%M:%S")
         if len(failed_idx_list)>0:
             myfunc.WriteFile(date_str, failedtagfile, "w", True)
 
+        myfunc.WriteFile(date_str, finishtagfile, "w", True)
+
         if finish_status == "success":
             shutil.rmtree(tmpdir)
+
 
         # send the result to email
         if myfunc.IsValidEmailAddress(email):#{{{
@@ -1926,7 +1932,7 @@ def main(g_params):#{{{
                             remotequeueDict[node].append(remotejobid)
 
 
-        if loop % 100 == 1:
+        if loop % 100 == 10:
             RunStatistics(path_result, path_log)
             DeleteOldResult(path_result, path_log)
 
