@@ -474,6 +474,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
     finished_seq_file = "%s/finished_seqs.txt"%(outpath_result)
     tmpdir = "%s/tmpdir"%(rstdir)
     qdinittagfile = "%s/runjob.qdinit"%(rstdir)
+    qdinit_start_tagfile = "%s/runjob.qdinit.start"%(rstdir)
     failedtagfile = "%s/%s"%(rstdir, "runjob.failed")
     starttagfile = "%s/%s"%(rstdir, "runjob.start")
     fafile = "%s/query.fa"%(rstdir)
@@ -503,6 +504,8 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
     # 1. generate a file with sorted seqindex
     # 2. generate splitted sequence files named by the original seqindex
     if not os.path.exists(qdinittagfile): #initialization#{{{
+        date_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+        myfunc.WriteFile(date_str, qdinit_start_tagfile, "w", True)
         if not os.path.exists(tmpdir):
             os.mkdir(tmpdir)
 
@@ -526,10 +529,39 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
             for i in xrange(len(seqIDList)):
                 toRunDict[i] = [seqList[i], 0, seqAnnoList[i]]
         else:
+            con = sqlite3.connect(db_cache_SCAMPI2MSA)
+            with con:
+                cur = con.cursor()
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS %s
+                    (
+                        md5 VARCHAR(100),
+                        seq VARCHAR(30000),
+                        top VARCHAR(30000),
+                        PRIMARY KEY (md5)
+                    )"""%(dbmsa_tablename))
             for i in xrange(len(seqIDList)):
+                seq = seqList[i]
+                description = seqAnnoList[i]
                 if not str(i) in init_finished_idx_set:
-                    toRunDict[i] = [seqList[i], 0, seqAnnoList[i]] #init value for numTM is 0
-
+                    isSkip = False
+                    md5_key = hashlib.md5(seq).hexdigest()
+                    cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
+                            dbmsa_tablename, md5_key)
+                    cur.execute(cmd)
+                    rows = cur.fetchall()
+                    for row in rows:
+                        top = row[2]
+                        numTM = myfunc.CountTM(top)
+                        # info_finish has 8 items
+                        info_finish = [ "seq_%d"%i, str(len(seq)), str(numTM),
+                                "cached", str(0.0), description, seq, top]
+                        myfunc.WriteFile("\t".join(info_finish)+"\n",
+                                finished_seq_file, "a", isFlush=True)
+                        myfunc.WriteFile("%d\n"%(cnt), finished_idx_file, "a", isFlush=True)
+                        isSkip = True
+                    if not isSkip:
+                        toRunDict[i] = [seqList[i], 0, seqAnnoList[i]] #init value for numTM is 0
 
         sortedlist = sorted(toRunDict.items(), key=lambda x:x[1][1], reverse=True)
 

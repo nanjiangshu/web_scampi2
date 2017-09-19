@@ -89,7 +89,12 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     runjob_logfile = "%s/runjob.log"%(outpath)
     finishtagfile = "%s/runjob.finish"%(outpath)
     rmsg = ""
+    qdinit_start_tagfile = "%s/runjob.qdinit.start"%(outpath)
 
+    # if the daemon starts to process the job before the run_job.py running 
+    # in the local queue, skip it
+    if os.path.exists(qdinit_start_tagfile):
+        return 0
 
     resultpathname = jobid
 
@@ -121,7 +126,6 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 #first getting result from caches
 # ==================================
     maplist = []
-    maplist_simple = []
     toRunDict = {}
     hdl = myfunc.ReadFastaByBlock(infile, method_seqid=0, method_seq=0)
     if hdl.failure:
@@ -129,26 +133,25 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     else:
         datetime = time.strftime("%Y-%m-%d %H:%M:%S")
         rt_msg = myfunc.WriteFile(datetime, starttagfile)
-
-        recordList = hdl.readseq()
         cnt = 0
         origpath = os.getcwd()
-        while recordList != None:
-            for rd in recordList:
-                isSkip = False
-                if not g_params['isForceRun']:
-                    md5_key = hashlib.md5(rd.seq).hexdigest()
-                    con = sqlite3.connect(db_cache_SCAMPI2MSA)
-                    with con:
-                        cur = con.cursor()
-                        cur.execute("""
-                            CREATE TABLE IF NOT EXISTS %s
-                            (
-                                md5 VARCHAR(100),
-                                seq VARCHAR(30000),
-                                top VARCHAR(30000),
-                                PRIMARY KEY (md5)
-                            )"""%(dbmsa_tablename))
+        con = sqlite3.connect(db_cache_SCAMPI2MSA)
+        with con:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS %s
+                (
+                    md5 VARCHAR(100),
+                    seq VARCHAR(30000),
+                    top VARCHAR(30000),
+                    PRIMARY KEY (md5)
+                )"""%(dbmsa_tablename))
+            recordList = hdl.readseq()
+            while recordList != None:
+                for rd in recordList:
+                    isSkip = False
+                    if not g_params['isForceRun']:
+                        md5_key = hashlib.md5(rd.seq).hexdigest()
                         cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
                                 dbmsa_tablename, md5_key)
                         cur.execute(cmd)
@@ -164,16 +167,14 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                             myfunc.WriteFile("%d\n"%(cnt), finished_idx_file, "a", isFlush=True)
                             isSkip = True
 
-                if not isSkip:
-                    # first try to delete the outfolder if exists
-                    origIndex = cnt
-                    numTM = 0
-                    toRunDict[origIndex] = [rd.seq, numTM, rd.description] #init value for numTM is 0
-
-                cnt += 1
-            recordList = hdl.readseq()
-        hdl.close()
-    myfunc.WriteFile("\n".join(maplist_simple)+"\n", mapfile)
+                    if not isSkip:
+                        # first try to delete the outfolder if exists
+                        origIndex = cnt
+                        numTM = 0
+                        toRunDict[origIndex] = [rd.seq, numTM, rd.description] #init value for numTM is 0
+                    cnt += 1
+                recordList = hdl.readseq()
+            hdl.close()
 
 
     if not g_params['isOnlyGetCache']:
