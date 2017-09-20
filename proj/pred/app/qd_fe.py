@@ -250,9 +250,9 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             starttagfile = "%s/%s"%(rstdir, "runjob.start")
             finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
             if os.path.exists(starttagfile):
-                start_date_str = myfunc.ReadFile(starttagfile).strip()
+                start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST")
             if os.path.exists(finishtagfile):
-                finish_date_str = myfunc.ReadFile(finishtagfile).strip()
+                finish_date_str = myfunc.ReadFile(finishtagfile).strip().rstrip("CEST")
 
             jobinfofile = "%s/jobinfo"%(rstdir)
             jobinfo = myfunc.ReadFile(jobinfofile).strip()
@@ -953,21 +953,27 @@ def GetResult(jobid):#{{{
                                 md5_key = hashlib.md5(seq).hexdigest()
                                 predfile = "%s/query.top"%( outpath_this_seq)
                                 (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
-                                con = sqlite3.connect(db_cache_SCAMPI2MSA)
-                                with con:
-                                    cur = con.cursor()
-                                    cur.execute("""
-                                        CREATE TABLE IF NOT EXISTS %s
-                                        (
-                                            md5 VARCHAR(100),
-                                            seq VARCHAR(30000),
-                                            top VARCHAR(30000),
-                                            PRIMARY KEY (md5)
-                                        )"""%(dbmsa_tablename))
-                                    cmd =  "INSERT OR REPLACE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
-                                    cur.execute(cmd)
+                                if len(top) == len(seq):
+                                    con = sqlite3.connect(db_cache_SCAMPI2MSA)
+                                    with con:
+                                        cur = con.cursor()
+                                        cur.execute("""
+                                            CREATE TABLE IF NOT EXISTS %s
+                                            (
+                                                md5 VARCHAR(100),
+                                                seq VARCHAR(30000),
+                                                top VARCHAR(30000),
+                                                PRIMARY KEY (md5)
+                                            )"""%(dbmsa_tablename))
+                                        cmd =  "INSERT OR REPLACE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
+                                        cur.execute(cmd)
 
-                                shutil.rmtree(outpath_this_seq)
+                                else:
+                                    date_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                                    logmsg = "[Date: %s] bad prediction for %s, len(top)=%d\n"%(
+                                            date_str, subfoldername_this_seq, len(top))
+                                    myfunc.WriteFile(logmsg, gen_logfile, "a", True)
+                                    isSuccess = False
 
 #}}}
                 elif status in ["Failed", "None"]:
@@ -1017,6 +1023,7 @@ def GetResult(jobid):#{{{
             myfunc.WriteFile("%d\n"%(origIndex), finished_idx_file, "a", isFlush=True)
             finished_info_list.append("\t".join(info_finish))
             finished_idx_list.append(str(origIndex))
+            shutil.rmtree(outpath_this_seq)
             #}}}
 
         if not isFinish_remote:
@@ -1097,7 +1104,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         for i in xrange(len(seqIDList)):
             maplist.append("%s\t%d\t%s\t%s"%("seq_%d"%i, len(seqList[i]),
                 seqAnnoList[i], seqList[i]))
-        start_date_str = myfunc.ReadFile(starttagfile).strip()
+        start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST").strip()
         start_date_epoch = datetime.datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S").strftime('%s')
         all_runtime_in_sec = float(date_str_epoch) - float(start_date_epoch)
 
