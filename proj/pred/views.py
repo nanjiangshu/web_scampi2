@@ -1134,11 +1134,11 @@ def get_finished_job(request):#{{{
     if isSuperUser:
         maxdaystoshow = BIG_NUMBER
         info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "Host", "QueueTime","RunTime", "Date", "Source"]
+                "Email", "Method", "Host", "QueueTime","RunTime", "Date", "Source"]
     else:
         maxdaystoshow = MAX_DAYS_TO_SHOW
         info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "QueueTime","RunTime", "Date", "Source"]
+                "Email", "Method", "QueueTime","RunTime", "Date", "Source"]
 
     info['MAX_DAYS_TO_SHOW'] = maxdaystoshow
 
@@ -1216,16 +1216,18 @@ def get_finished_job(request):#{{{
                 submit_date_str = finished_job_dict[jobid][6]
                 start_date_str = finished_job_dict[jobid][7]
                 finish_date_str = finished_job_dict[jobid][8]
+                app_type = finished_job_dict[jobid][9]
             else:
                 jobinfofile = "%s/jobinfo"%(rstdir)
                 jobinfo = myfunc.ReadFile(jobinfofile).strip()
                 jobinfolist = jobinfo.split("\t")
-                if len(jobinfolist) >= 8:
+                if len(jobinfolist) >= 9:
                     submit_date_str = jobinfolist[0]
                     numseq = int(jobinfolist[3])
                     jobname = jobinfolist[5]
                     email = jobinfolist[6]
                     method_submission = jobinfolist[7]
+                    app_type = jobinfolist[8]
 
             isValidSubmitDate = True
             isValidStartDate = True
@@ -1255,11 +1257,11 @@ def get_finished_job(request):#{{{
 
             if info['isSuperUser']:
                 finished_job_info_list.append([rank, jobid, jobname[:20],
-                    str(numseq), email, ip, queuetime, runtime, submit_date_str,
+                    str(numseq), email, app_type, ip, queuetime, runtime, submit_date_str,
                     method_submission])
             else:
                 finished_job_info_list.append([rank, jobid, jobname[:20],
-                    str(numseq), email, queuetime, runtime, submit_date_str,
+                    str(numseq), email, app_type, queuetime, runtime, submit_date_str,
                     method_submission])
 
         info['content'] = finished_job_info_list

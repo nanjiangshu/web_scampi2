@@ -1943,10 +1943,13 @@ def main(g_params):#{{{
             RunStatistics(path_result, path_log)
             DeleteOldResult(path_result, path_log)
 
-        if os.path.exists(gen_logfile):
-            myfunc.ArchiveFile(gen_logfile, threshold_logfilesize)
-        if os.path.exists(gen_errfile):
-            myfunc.ArchiveFile(gen_errfile, threshold_logfilesize)
+        for f in [gen_logfile, gen_errfile,
+                "%s/restart_qd_fe.cgi.log"%(path_log),
+                "%s/debug.log"%(path_log),
+                "%s/submit_job_to_queue.py.log"%(path_log)
+                ]:
+            if os.path.exists(f):
+                myfunc.ArchiveFile(f, threshold_logfilesize)
         # For finished jobs, clean data not used for caching
 
         cntSubmitJobDict = {} # format of cntSubmitJobDict {'node_ip': INT, 'node_ip': INT}
