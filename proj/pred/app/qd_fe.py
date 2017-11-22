@@ -345,6 +345,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             ip = li[3]
             email = li[4].strip()
             rstdir = "%s/%s"%(path_result, jobid)
+            numseq = int(li[5])
             outpath_result = "%s/%s"%(rstdir, jobid)
 
             # if loop == 0 , for new_waitjob_list and new_runjob_list
