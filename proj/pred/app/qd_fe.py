@@ -352,6 +352,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             if loop == 0 and os.path.exists(outpath_result):#{{{
                 finished_seq_file = "%s/finished_seqs.txt"%(outpath_result)
                 finished_idx_file = "%s/finished_seqindex.txt"%(rstdir)
+                torun_idx_file = "%s/torun_seqindex.txt"%(rstdir) # ordered seq index to run
                 finished_idx_set = set([])
 
                 finished_seqs_idlist = []
@@ -361,10 +362,19 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                 for finished_id in finished_seqs_idset:
                     origIndex_str = finished_id.split("_")[1]
                     finished_idx_set.add(origIndex_str)
+
+                all_idx_list = [str(x) for x in xrange(numseq)]
+                torun_idx_str_list = list(set(all_idx_list)-finished_idx_set)
+
                 if len(finished_idx_set) > 0:
                     myfunc.WriteFile("\n".join(list(finished_idx_set))+"\n", finished_idx_file, "w", True)
                 else:
                     myfunc.WriteFile("", finished_idx_file, "w", True)
+
+                if len(torun_idx_str_list) > 0:
+                    myfunc.WriteFile("\n".join(list(torun_idx_str_list))+"\n", torun_idx_file, "w", True)
+                else:
+                    myfunc.WriteFile("", torun_idx_file, "w", True)
 
 
             #}}}
