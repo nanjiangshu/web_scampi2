@@ -60,7 +60,7 @@ path_log = "%s/static/log"%(SITE_ROOT)
 gen_logfile = "%s/static/log/%s.log"%(SITE_ROOT, progname)
 MAX_ALLOWD_NUMSEQ_single = 100000
 MAX_ALLOWD_NUMSEQ_msa = 2000
-MIN_LEN_SEQ=5
+MIN_LEN_SEQ=10
 MAX_LEN_SEQ=10000
 path_result = "%s/static/result"%(SITE_ROOT)
 
