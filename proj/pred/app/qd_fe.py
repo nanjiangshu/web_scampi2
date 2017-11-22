@@ -345,8 +345,17 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             ip = li[3]
             email = li[4].strip()
             rstdir = "%s/%s"%(path_result, jobid)
-            numseq = int(li[5])
             outpath_result = "%s/%s"%(rstdir, jobid)
+            try:
+                numseq = int(li[5])
+            except:
+                numseq = 1
+                pass
+            try:
+                numseq_this_user = numseq_user_dict[jobid]
+            except:
+                numseq_this_user = numseq
+                pass
 
             # if loop == 0 , for new_waitjob_list and new_runjob_list
             # re-generate finished_seqs.txt
@@ -380,16 +389,6 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
 
             #}}}
 
-            try:
-                numseq = int(li[5])
-            except:
-                numseq = 1
-                pass
-            try:
-                numseq_this_user = numseq_user_dict[jobid]
-            except:
-                numseq_this_user = numseq
-                pass
             # note that the priority is deducted by numseq so that for jobs
             # from the same user, jobs with fewer sequences are placed with
             # higher priority
