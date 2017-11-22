@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python
 # Description: daemon to submit jobs and retrieve results to/from remote
 #              servers
@@ -357,46 +358,9 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                 if os.path.exists(finished_seq_file):
                     finished_seqs_idlist = myfunc.ReadIDList2(finished_seq_file, col=0, delim="\t")
                 finished_seqs_idset = set(finished_seqs_idlist)
-                finished_info_list = []
-                queryfile = "%s/query.fa"%(rstdir)
-                (seqidlist, seqannolist, seqlist) = myfunc.ReadFasta(queryfile)
-                try:
-                    dirlist = os.listdir(outpath_result)
-                    for dd in dirlist:
-                        if dd.find("seq_") == 0:
-                            origIndex_str = dd.split("_")[1]
-                            finished_idx_set.add(origIndex_str)
-
-                        if dd.find("seq_") == 0 and dd not in finished_seqs_idset:
-                            origIndex = int(dd.split("_")[1])
-                            outpath_this_seq = "%s/%s"%(outpath_result, dd)
-                            timefile = "%s/time.txt"%(outpath_this_seq)
-                            runtime1 = 0.0
-                            seq = seqlist[origIndex]
-                            description = seqannolist[origIndex]
-                            if os.path.exists(timefile):
-                                txt = myfunc.ReadFile(timefile).strip()
-                                ss2 = txt.split(";")
-                                try:
-                                    runtime = float(ss2[1])
-                                except:
-                                    runtime = runtime1
-                                    pass
-                            else:
-                                runtime = runtime1
-
-                            predfile = "%s/query.top"%( outpath_this_seq)
-                            (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
-                            numTM = myfunc.CountTM(top)
-                            info_finish = [ dd, str(len(seq)), str(numTM),
-                                    "newrun", str(runtime), description, seq, top]
-                            finished_info_list.append("\t".join(info_finish))
-                except:
-                    date_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                    myfunc.WriteFile("[Date: %s] Failed to os.listdir(%s)\n"%(date_str, outpath_result), gen_errfile, "a", True)
-                    raise
-                if len(finished_info_list)>0:
-                    myfunc.WriteFile("\n".join(finished_info_list)+"\n", finished_seq_file, "a", True)
+                for finished_id in finished_seqs_idset:
+                    origIndex_str = finished_id.split("_")[1]
+                    finished_idx_set.add(origIndex_str)
                 if len(finished_idx_set) > 0:
                     myfunc.WriteFile("\n".join(list(finished_idx_set))+"\n", finished_idx_file, "w", True)
                 else:
@@ -921,6 +885,32 @@ def GetResult(jobid):#{{{
                                 isSuccess = True
 
                             if isSuccess:
+                                # create or update the md5 cache
+                                md5_key = hashlib.md5(seq).hexdigest()
+                                predfile = "%s/query.top"%( outpath_this_seq)
+                                (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
+                                if len(top) == len(seq):
+                                    con = sqlite3.connect(db_cache_SCAMPI2MSA)
+                                    with con:
+                                        cur = con.cursor()
+                                        cur.execute("""
+                                            CREATE TABLE IF NOT EXISTS %s
+                                            (
+                                                md5 VARCHAR(100),
+                                                seq VARCHAR(30000),
+                                                top VARCHAR(30000),
+                                                PRIMARY KEY (md5)
+                                            )"""%(dbmsa_tablename))
+                                        cmd =  "INSERT OR REPLACE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
+                                        cur.execute(cmd)
+
+                                else:
+                                    date_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                                    logmsg = "[Date: %s] bad prediction for %s, len(top)=%d\n"%(
+                                            date_str, subfoldername_this_seq, len(top))
+                                    myfunc.WriteFile(logmsg, gen_logfile, "a", True)
+                                    isSuccess = False
+
                                 # delete the data on the remote server
                                 try:
                                     rtValue2 = myclient.service.deletejob(remote_jobid)
@@ -949,31 +939,6 @@ def GetResult(jobid):#{{{
                                 os.remove(outfile_zip)
                                 shutil.rmtree("%s/%s"%(tmpdir, remote_jobid))
 
-                                # create or update the md5 cache
-                                md5_key = hashlib.md5(seq).hexdigest()
-                                predfile = "%s/query.top"%( outpath_this_seq)
-                                (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
-                                if len(top) == len(seq):
-                                    con = sqlite3.connect(db_cache_SCAMPI2MSA)
-                                    with con:
-                                        cur = con.cursor()
-                                        cur.execute("""
-                                            CREATE TABLE IF NOT EXISTS %s
-                                            (
-                                                md5 VARCHAR(100),
-                                                seq VARCHAR(30000),
-                                                top VARCHAR(30000),
-                                                PRIMARY KEY (md5)
-                                            )"""%(dbmsa_tablename))
-                                        cmd =  "INSERT OR REPLACE INTO %s(md5,  seq, top) VALUES('%s', '%s','%s')"%(dbmsa_tablename, md5_key, seq, top)
-                                        cur.execute(cmd)
-
-                                else:
-                                    date_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                                    logmsg = "[Date: %s] bad prediction for %s, len(top)=%d\n"%(
-                                            date_str, subfoldername_this_seq, len(top))
-                                    myfunc.WriteFile(logmsg, gen_logfile, "a", True)
-                                    isSuccess = False
 
 #}}}
                 elif status in ["Failed", "None"]:
