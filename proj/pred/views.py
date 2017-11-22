@@ -1021,6 +1021,11 @@ def get_running(request):#{{{
             jobinfofile = "%s/jobinfo"%(rstdir)
             jobinfo = myfunc.ReadFile(jobinfofile).strip()
             jobinfolist = jobinfo.split("\t")
+            finished_idx_file = "%s/finished_seqindex.txt"%(rstdir)
+            numFinishedSeq = 0
+            if os.path.exists(finished_idx_file):
+                finished_idxlist = myfunc.ReadIDList(finished_idx_file)
+                numFinishedSeq = len(set(finished_idxlist))
             if len(jobinfolist) >= 8:
                 submit_date_str = jobinfolist[0]
                 ip = jobinfolist[2]
@@ -1051,20 +1056,20 @@ def get_running(request):#{{{
 
             if isSuperUser:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, email, ip, queuetime, runtime,
+                    numseq, numFinishedSeq, email, ip, queuetime, runtime,
                     submit_date_str, method_submission])
             else:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, email, queuetime, runtime,
+                    numseq, numFinishedSeq, email, queuetime, runtime,
                     submit_date_str, method_submission])
 
 
         info['BASEURL'] = BASEURL
         if info['isSuperUser']:
-            info['header'] = ["No.", "JobID","JobName", "NumSeq",
+            info['header'] = ["No.", "JobID","JobName", "NumSeq","NumFinish",
                     "Email", "Host", "QueueTime","RunTime", "Date", "Source"]
         else:
-            info['header'] = ["No.", "JobID","JobName", "NumSeq",
+            info['header'] = ["No.", "JobID","JobName", "NumSeq","NumFinish",
                     "Email", "QueueTime","RunTime", "Date", "Source"]
         info['content'] = jobid_inqueue_list
 
