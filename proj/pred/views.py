@@ -120,42 +120,6 @@ def SetColorStatus(status):#{{{
     else:
         return "black"
 #}}}
-def ReadFinishedJobLog(infile, status=""):#{{{
-    dt = {}
-    if not os.path.exists(infile):
-        return dt
-
-    hdl = myfunc.ReadLineByBlock(infile)
-    if not hdl.failure:
-        lines = hdl.readlines()
-        while lines != None:
-            for line in lines:
-                if not line or line[0] == "#":
-                    continue
-                strs = line.split("\t")
-                if len(strs)>= 10:
-                    jobid = strs[0]
-                    status_this_job = strs[1]
-                    if status == "" or status == status_this_job:
-                        jobname = strs[2]
-                        ip = strs[3]
-                        email = strs[4]
-                        try:
-                            numseq = int(strs[5])
-                        except:
-                            numseq = 1
-                        method_submission = strs[6]
-                        submit_date_str = strs[7]
-                        start_date_str = strs[8]
-                        finish_date_str = strs[9]
-                        dt[jobid] = [status_this_job, jobname, ip, email,
-                                numseq, method_submission, submit_date_str,
-                                start_date_str, finish_date_str]
-            lines = hdl.readlines()
-        hdl.close()
-
-    return dt
-#}}}
 def submit_seq(request):#{{{
     info = {}
 
@@ -410,7 +374,7 @@ def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
     if hdl.failure:
         return jobcounter
     else:
-        finished_job_dict = ReadFinishedJobLog(logfile_finished_jobid)
+        finished_job_dict = myfunc.ReadFinishedJobLog(logfile_finished_jobid)
         finished_jobid_set = set([])
         failed_jobid_set = set([])
         for jobid in finished_job_dict:
@@ -1148,7 +1112,7 @@ def get_finished_job(request):#{{{
         info['errmsg'] = ""
         pass
     else:
-        finished_job_dict = ReadFinishedJobLog(divided_logfile_finished_jobid)
+        finished_job_dict = myfunc.ReadFinishedJobLog(divided_logfile_finished_jobid)
         jobRecordList = []
         lines = hdl.readlines()
         current_time = datetime.now()
@@ -1312,7 +1276,7 @@ def get_failed_job(request):#{{{
         info['errmsg'] = ""
         pass
     else:
-        finished_job_dict = ReadFinishedJobLog(divided_logfile_finished_jobid)
+        finished_job_dict = myfunc.ReadFinishedJobLog(divided_logfile_finished_jobid)
         jobRecordList = []
         lines = hdl.readlines()
         current_time = datetime.now()
