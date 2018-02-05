@@ -19,3 +19,6 @@ bak.env/
 
 
 soft/blast
+
+proj/pred/config/computenode.txt
+proj/pred/config/config.json
