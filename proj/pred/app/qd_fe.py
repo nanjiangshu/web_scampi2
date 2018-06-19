@@ -1002,7 +1002,22 @@ def GetResult(jobid):#{{{
             #}}}
 
         if not isFinish_remote:
-            keep_queueline_list.append(line)
+            time_in_remote_queue = time.time() - submit_time_epoch
+            # for jobs queued in the remote queue more than one day (but not
+            # running) delete it and try to resubmit it. This solved the
+            # problem of dead jobs in the remote server due to server
+            # rebooting)
+            if status != "Running" and time_in_remote_queue > g_params['MAX_TIME_IN_REMOTE_QUEUE']:
+                # delete the remote job on the remote server
+                try:
+                    rtValue2 = myclient.service.deletejob(remote_jobid)
+                except Exception as e:
+                    date_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                    myfunc.WriteFile( "[Date: %s] Failed to run myclient.service.deletejob(%s) on node %s with msg %s\n"%(date_str, remote_jobid, node, str(e)), gen_logfile, "a", True)
+                    rtValue2 = []
+                    pass
+            else:
+                keep_queueline_list.append(line)
 #}}}
     #Finally, write log files
     finished_idx_list = list(set(finished_idx_list))
@@ -1914,7 +1929,7 @@ def main(g_params):#{{{
                             remotequeueDict[node].append(remotejobid)
 
 
-        if loop % 100 == 10:
+        if loop % 500 == 10:
             RunStatistics(path_result, path_log)
             DeleteOldResult(path_result, path_log)
 
@@ -1994,6 +2009,7 @@ def InitGlobalParameter():#{{{
     g_params['DEBUG_CACHE'] = False
     g_params['SLEEP_INTERVAL'] = 5    # sleep interval in seconds
     g_params['MAX_SUBMIT_JOB_PER_NODE'] = 200
+    g_params['MAX_TIME_IN_REMOTE_QUEUE'] = 3600*24 # one day in seconds
     g_params['MAX_KEEP_DAYS'] = 60
     g_params['MAX_RESUBMIT'] = 2
     return g_params
