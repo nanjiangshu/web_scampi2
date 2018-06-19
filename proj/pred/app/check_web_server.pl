@@ -18,8 +18,6 @@ my $rundir = dirname(abs_path(__FILE__));
 my $basedir = "$rundir/../";
 require "$rundir/nanjianglib.pl";
 
-my @to_email_list = (
-    "nanjiang.shu\@gmail.com");
 
 my $date = localtime();
 print "Date: $date\n";
