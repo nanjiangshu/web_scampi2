@@ -262,9 +262,11 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             if len(jobinfolist) >= 9:
                 app_type = jobinfolist[8]
 
+            # li has  11 fields, one more compared to other web-servers, such as TOPCONS2
             li = [jobid, status, jobname, ip, email, numseq_str,
                     method_submission, submit_date_str, start_date_str,
-                    finish_date_str, app_type]
+                    finish_date_str, app_type] 
+
             if status in ["Finished", "Failed"]:
                 new_finished_list.append(li)
 
@@ -402,19 +404,19 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                 priority = 999999999.0
                 myfunc.WriteFile("email %s in vip_user_list\n"%(email), gen_logfile, "a", True)
 
-            li.append(numseq_this_user)
-            li.append(priority)
+            li.append(numseq_this_user) #12th field
+            li.append(priority)         #13th field
 
 
     # sort the new_waitjob_list in descending order by priority
-    new_waitjob_list = sorted(new_waitjob_list, key=lambda x:x[11], reverse=True)
-    new_runjob_list = sorted(new_runjob_list, key=lambda x:x[11], reverse=True)
+    new_waitjob_list = sorted(new_waitjob_list, key=lambda x:x[12], reverse=True)
+    new_runjob_list = sorted(new_runjob_list, key=lambda x:x[12], reverse=True)
 
     # write to runjoblogfile
     li_str = []
     for joblist in [new_waitjob_list, new_runjob_list]:
         for li in joblist:
-            li2 = li[:10]+[str(li[10]), str(li[11])]
+            li2 = li[:11]+[str(li[11]), str(li[12])]
             li_str.append("\t".join(li2))
 #     print "write to", runjoblogfile
 #     print "\n".join(li_str)
