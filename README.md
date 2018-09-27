@@ -1,6 +1,6 @@
-#Web-server for SCAMPI2
+# Web-server for SCAMPI2
 
-##Description:
+## Description:
     This is the web-server implementation of the SCAMPI2 workflow.
 
     The web-server is developed with Django (>=1.6.4)
@@ -9,10 +9,10 @@
     of the license is included in the repository)
 
 
-##Author
+## Author
 Nanjiang Shu
 
-Short-term bioinformatics support at NBIS
+System developer at NBIS
 
 Email: nanjiang.shu@scilifelab.se
 
@@ -51,7 +51,7 @@ Email: nanjiang.shu@scilifelab.se
 
 6.  On the computational node. run 
 
-    $ virtualenv env --system-site-packages
+        $ virtualenv env --system-site-packages
 
     to make sure that python can use all other system-wide installed packages
 
