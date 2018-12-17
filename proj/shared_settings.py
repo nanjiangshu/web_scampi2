@@ -40,6 +40,9 @@ ROOT_URLCONF = 'proj.urls'
 
 WSGI_APPLICATION = 'proj.wsgi.application'
 
+LOGIN_REDIRECT_URL = '/pred'
+LOGOUT_REDIRECT_URL = '/pred/login'
+
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -50,9 +53,26 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     },
 }
-TEMPLATE_DIRS = (
-        "%s/%s/%s/"%(BASE_DIR, "proj/pred", "static"),
-        )
+
+TEMPLATES = [ 
+    {   
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            os.path.join(BASE_DIR, 'pred', 'templates'),
+            os.path.join(BASE_DIR, 'pred', 'static'),
+            ],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'debug': True,
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],  
+        },  
+    },  
+]
 
 # LOGGING configuration
 LOGGING = {
@@ -73,7 +93,7 @@ LOGGING = {
         },
     },
 }
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
