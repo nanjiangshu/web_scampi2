@@ -157,7 +157,7 @@ def CalculateQueue(resultdir, outfile):#{{{
             freq_user_in_queue[user] += 1
 
             try:
-                date_submitted = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                date_submitted = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S %Z')
             except ValueError:
                 print >> sys.stderr, "datefile = '%s'. date = '%s'"%("%s/date"%(workdir), date_str)
                 print >> sys.stderr, "Ignore %s"%folder

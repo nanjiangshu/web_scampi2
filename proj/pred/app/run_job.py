@@ -90,10 +90,11 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     all_begin_time = time.time()
 
     rootname = os.path.basename(os.path.splitext(infile)[0])
-    starttagfile   = "%s/runjob.start"%(outpath)
     runjob_errfile = "%s/runjob.err"%(outpath)
     runjob_logfile = "%s/runjob.log"%(outpath)
+    starttagfile   = "%s/runjob.start"%(outpath)
     finishtagfile = "%s/runjob.finish"%(outpath)
+    failtagfile = "%s/runjob.failed"%(outpath)
     rmsg = ""
     qdinit_start_tagfile = "%s/runjob.qdinit.start"%(outpath)
 
@@ -137,8 +138,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     if hdl.failure:
         isOK = False
     else:
-        date_str = time.strftime(FORMAT_DATETIME)
-        rt_msg = myfunc.WriteFile(date_str, starttagfile)
+        webserver_common.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
         cnt = 0
         origpath = os.getcwd()
         con = sqlite3.connect(db_cache_SCAMPI2MSA)
@@ -230,28 +230,11 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             numCPU = 4
             outtopfile = "%s/query.top"%(tmp_outpath_this_seq)
             cmd = [runscript_msa, seqfile_this_seq, outtopfile, blastdir, blastdb]
-            g_params['runjob_log'].append(" ".join(cmd))
-            begin_time = time.time()
-            try:
-                rmsg = subprocess.check_output(cmd)
-            except subprocess.CalledProcessError, e:
-                g_params['runjob_err'].append(str(e)+"\n")
-                g_params['runjob_err'].append(rmsg + "\n")
-                pass
-            end_time = time.time()
-            runtime_in_sec = end_time - begin_time
+            (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
 
             if os.path.exists(tmp_outpath_this_seq):
                 cmd = ["mv","-f", tmp_outpath_this_seq, outpath_this_seq]
-                isCmdSuccess = False
-                try:
-                    subprocess.check_output(cmd)
-                    isCmdSuccess = True
-                except subprocess.CalledProcessError, e:
-                    msg =  "Failed to run prediction for sequence No. %d\n"%(origIndex)
-                    g_params['runjob_err'].append(msg)
-                    g_params['runjob_err'].append(str(e)+"\n")
-                    pass
+                (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
 
                 if isCmdSuccess:
                     runtime = runtime_in_sec #in seconds
@@ -273,11 +256,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             g_params['runjob_err'].append(rt_msg)
 
     if not g_params['isOnlyGetCache'] or len(toRunDict) == 0:
-        date_str = time.strftime(FORMAT_DATETIME)
         if os.path.exists(finished_seq_file):
-            rt_msg = myfunc.WriteFile(date_str, finishtagfile)
-            if rt_msg:
-                g_params['runjob_err'].append(rt_msg)
+            webserver_common.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
 
 # now write the text output to a single file
         dumped_resultfile = "%s/%s"%(outpath_result, "query.top")
@@ -289,13 +269,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         # now making zip instead (for windows users)
         pwd = os.getcwd()
         os.chdir(outpath)
-#             cmd = ["tar", "-czf", tarball, resultpathname]
         cmd = ["zip", "-rq", zipfile, resultpathname]
-        try:
-            subprocess.check_output(cmd)
-        except subprocess.CalledProcessError, e:
-            g_params['runjob_err'].append(str(e))
-            pass
+        webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
         os.chdir(pwd)
 
 
@@ -306,7 +281,6 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             shutil.rmtree(tmpdir) #DEBUG, keep tmpdir
         else:
             isSuccess = False
-            failtagfile = "%s/runjob.failed"%(outpath)
             webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
@@ -365,35 +339,14 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 
     if isOK:
-        date_str = time.strftime(FORMAT_DATETIME)
-        rt_msg = myfunc.WriteFile(date_str, starttagfile)
+        webserver_common.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
 
         cmd = [runscript_single, infile,  tmp_outfile]
-        cmdline = " ".join(cmd)
-        g_params['runjob_log'].append(" ".join(cmd))
-        myfunc.WriteFile(cmdline+"\n", runjob_logfile, "a", True)
-        begin_time = time.time()
-        try:
-            rmsg = subprocess.check_output(cmd)
-            g_params['runjob_log'].append("workflow:\n"+rmsg+"\n")
-        except subprocess.CalledProcessError, e:
-            g_params['runjob_err'].append(str(e)+"\n")
-            g_params['runjob_err'].append(rmsg + "\n")
-            pass
-        end_time = time.time()
-        runtime_in_sec = end_time - begin_time
+        (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
 
         if os.path.exists(tmp_outfile):
             cmd = ["mv","-f", tmp_outfile, outfile]
-            isCmdSuccess = False
-            try:
-                subprocess.check_output(cmd)
-                isCmdSuccess = True
-            except subprocess.CalledProcessError, e:
-                msg =  "Failed to run prediction for the query sequence\n"
-                g_params['runjob_err'].append(msg)
-                g_params['runjob_err'].append(str(e)+"\n")
-                pass
+            (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
             if isCmdSuccess:
                 runtime = runtime_in_sec #in seconds
 
@@ -402,11 +355,8 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             if rt_msg:
                 g_params['runjob_err'].append(rt_msg)
 
-        date_str = time.strftime(FORMAT_DATETIME)
         if os.path.exists(outfile):
-            rt_msg = myfunc.WriteFile(date_str, finishtagfile)
-            if rt_msg:
-                g_params['runjob_err'].append(rt_msg)
+            webserver_common.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
 
 
     isSuccess = False
