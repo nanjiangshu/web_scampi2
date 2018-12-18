@@ -95,6 +95,10 @@ from proj.pred.models import SubmissionForm
 from proj.pred.models import FieldContainer
 from django.template import Context, loader
 
+def set_basic_config(info):
+    """Set basic configurations for the template dict"""
+    info['STATIC_URL'] = settings.STATIC_URL
+
 def index(request):#{{{
     path_tmp = "%s/static/tmp"%(SITE_ROOT)
     path_md5 = "%s/static/md5"%(SITE_ROOT)
