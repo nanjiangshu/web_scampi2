@@ -285,11 +285,11 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 # send the result to email
 # do not sendmail at the cloud VM
-    if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
-        webserver_common.SendEmail_on_finish(jobid, base_www_url,
-                finish_status, name_server="SCAMPI2-msa", from_email="SCAMPI@scampi.bioinfo.se",
-                to_email=email, contact_email=contact_email,
-                logfile=runjob_logfile, errfile=runjob_errfile)
+        if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
+            webserver_common.SendEmail_on_finish(jobid, base_www_url,
+                    finish_status, name_server="SCAMPI2-msa", from_email="SCAMPI@scampi.bioinfo.se",
+                    to_email=email, contact_email=contact_email,
+                    logfile=runjob_logfile, errfile=runjob_errfile)
     return 0
 
 #}}}
@@ -298,11 +298,11 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
     rootname = os.path.basename(os.path.splitext(infile)[0])
     starttagfile   = "%s/runjob.start"%(outpath)
+    finishtagfile = "%s/runjob.finish"%(outpath)
+    failtagfile = "%s/runjob.failed"%(outpath)
     runjob_errfile = "%s/runjob.err"%(outpath)
     runjob_logfile = "%s/runjob.log"%(outpath)
-    finishtagfile = "%s/runjob.finish"%(outpath)
     rmsg = ""
-
 
     resultpathname = jobid
 
@@ -315,7 +315,6 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     zipfile_fullpath = "%s.zip"%(outpath_result)
     resultfile_text = "%s/%s"%(outpath_result, "query.result.txt")
     outfile = "%s/%s"%(outpath_result, "query.top")
-
 
     isOK = True
     try:
@@ -364,7 +363,6 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         isSuccess = True
     else:
         isSuccess = False
-        failtagfile = "%s/runjob.failed"%(outpath)
         webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
