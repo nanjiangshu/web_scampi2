@@ -95,10 +95,31 @@ from proj.pred.models import SubmissionForm
 from proj.pred.models import FieldContainer
 from django.template import Context, loader
 
-def set_basic_config(info):
+def set_basic_config(request, info):# {{{
     """Set basic configurations for the template dict"""
-    info['STATIC_URL'] = settings.STATIC_URL
+    username = request.user.username
+    client_ip = request.META['REMOTE_ADDR']
+    if username in settings.SUPER_USER_LIST:
+        isSuperUser = True
+        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
+                "static/log", "submitted_seq.log")
+        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
+                "static/log", "failed_job.log")
+    else:
+        isSuperUser = False
+        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
+                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
+        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
+                "static/log/divided", "%s_failed_job.log"%(client_ip))
 
+    info['username'] = username
+    info['isSuperUser'] = isSuperUser
+    info['divided_logfile_query'] = divided_logfile_query
+    info['divided_logfile_finished_jobid'] = divided_logfile_finished_jobid
+    info['client_ip'] = client_ip
+    info['BASEURL'] = BASEURL
+    info['STATIC_URL'] = settings.STATIC_URL
+# }}}
 def index(request):#{{{
     path_tmp = "%s/static/tmp"%(SITE_ROOT)
     path_md5 = "%s/static/md5"%(SITE_ROOT)
@@ -827,25 +848,7 @@ def get_queue(request):#{{{
     errfile = "%s/server.err"%(path_result)
 
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
+    set_basic_config(request, info)
 
     status = "Queued"
     if isSuperUser:
@@ -949,29 +952,10 @@ def get_queue(request):#{{{
 def get_running(request):#{{{
     # Get running jobs
     errfile = "%s/server.err"%(path_result)
-
     status = "Running"
-
     info = {}
 
-    client_ip = request.META['REMOTE_ADDR']
-    username = request.user.username
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
+    set_basic_config(request, info)
 
     hdl = myfunc.ReadLineByBlock(divided_logfile_query)
     if hdl.failure:
@@ -979,8 +963,8 @@ def get_running(request):#{{{
         pass
     else:
         finished_jobid_list = []
-        if os.path.exists(divided_logfile_finished_jobid):
-            finished_jobid_list = myfunc.ReadIDList2(divided_logfile_finished_jobid, 0, None)
+        if os.path.exists(info['divided_logfile_finished_jobid']):
+            finished_jobid_list = myfunc.ReadIDList2(info['divided_logfile_finished_jobid'], 0, None)
         finished_jobid_set = set(finished_jobid_list)
         jobRecordList = []
         lines = hdl.readlines()
@@ -991,7 +975,7 @@ def get_running(request):#{{{
                 if len(strs) < 7:
                     continue
                 ip = strs[2]
-                if not isSuperUser and ip != client_ip:
+                if not info['isSuperUser'] and ip != info['client_ip']:
                     continue
                 jobid = strs[1]
                 if jobid in finished_jobid_set:
@@ -1078,32 +1062,12 @@ def get_running(request):#{{{
                     "Email", "QueueTime","RunTime", "Date", "Source"]
         info['content'] = jobid_inqueue_list
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser, divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
     return render(request, 'pred/running.html', info)
 #}}}
 def get_finished_job(request):#{{{
     info = {}
-    info['BASEURL'] = BASEURL
-
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
+    set_basic_config(request, info)
 
     if isSuperUser:
         maxdaystoshow = BIG_NUMBER
@@ -1122,7 +1086,7 @@ def get_finished_job(request):#{{{
         info['errmsg'] = ""
         pass
     else:
-        finished_job_dict = myfunc.ReadFinishedJobLog(divided_logfile_finished_jobid)
+        finished_job_dict = myfunc.ReadFinishedJobLog(info['divided_logfile_finished_jobid'])
         jobRecordList = []
         lines = hdl.readlines()
         current_time = datetime.now()
@@ -1132,7 +1096,7 @@ def get_finished_job(request):#{{{
                 if len(strs) < 7:
                     continue
                 ip = strs[2]
-                if not isSuperUser and ip != client_ip:
+                if not info['isSuperUser'] and ip != info['client_ip']:
                     continue
 
                 submit_date_str = strs[0]
@@ -1240,34 +1204,15 @@ def get_finished_job(request):#{{{
 
         info['content'] = finished_job_info_list
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
     return render(request, 'pred/finished_job.html', info)
 #}}}
 def get_failed_job(request):#{{{
     info = {}
 
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "failed_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_failed_job.log"%(client_ip))
+    set_basic_config(request, info)
 
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-
-    if isSuperUser:
+    if info['isSuperUser']:
         maxdaystoshow = BIG_NUMBER
         info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email",
                 "Host", "QueueTime","RunTime", "Date", "Source"]
@@ -1276,17 +1221,15 @@ def get_failed_job(request):#{{{
         info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email",
                 "QueueTime","RunTime", "Date", "Source"]
 
-
     info['MAX_DAYS_TO_SHOW'] = maxdaystoshow
-    info['BASEURL'] = BASEURL
 
-    hdl = myfunc.ReadLineByBlock(divided_logfile_query)
+    hdl = myfunc.ReadLineByBlock(info['divided_logfile_query'])
     if hdl.failure:
 #         info['errmsg'] = "Failed to retrieve finished job information!"
         info['errmsg'] = ""
         pass
     else:
-        finished_job_dict = myfunc.ReadFinishedJobLog(divided_logfile_finished_jobid)
+        finished_job_dict = myfunc.ReadFinishedJobLog(info['divided_logfile_finished_jobid'])
         jobRecordList = []
         lines = hdl.readlines()
         current_time = datetime.now()
@@ -1296,7 +1239,7 @@ def get_failed_job(request):#{{{
                 if len(strs) < 7:
                     continue
                 ip = strs[2]
-                if not isSuperUser and ip != client_ip:
+                if not info['isSuperUser'] and ip != info['client_ip']:
                     continue
 
                 submit_date_str = strs[0]
@@ -1397,20 +1340,10 @@ def get_failed_job(request):#{{{
 
         info['content'] = failed_job_info_list
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
     return render(request, 'pred/failed_job.html', info)
 #}}}
 
-def search(request):#{{{
-    if 'q' in request.GET and request.GET['q']:
-        q = request.GET['q']
-        seq = Query.objects.filter(seqname=q)
-        return render(request, 'search_results.html',
-            {'seq': seq, 'query': q})
-    else:
-        return HttpResponse('Please submit a search term.')
-#}}}
 def get_help(request):#{{{
     info = {}
 
@@ -1474,56 +1407,15 @@ def get_news(request):#{{{
 #}}}
 def get_reference(request):#{{{
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
-
+    set_basic_config(request, info)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
     return render(request, 'pred/reference.html', info)
 #}}}
 
 
 def get_serverstatus(request):#{{{
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-    
-
+    set_basic_config(request, info)
 
     logfile_finished =  "%s/%s/%s"%(SITE_ROOT, "static/log", "finished_job.log")
     logfile_runjob =  "%s/%s/%s"%(SITE_ROOT, "static/log", "runjob_log.log")
@@ -1599,35 +1491,16 @@ def get_serverstatus(request):#{{{
     info['total_num_finished_seq_single'] = total_num_finished_seq_single
     info['num_finished_seqs_str'] = str(total_num_finished_seq)
     info['startdate'] = startdate
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
 
     return render(request, 'pred/serverstatus.html', info)
 #}}}
 def get_example(request):#{{{
     info = {}
 
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
+    set_basic_config(request, info)
 
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
 
     return render(request, 'pred/example.html', info)
 #}}}
@@ -1637,26 +1510,7 @@ def oldtopcons(request):#{{{
 #}}}
 def help_wsdl_api(request):#{{{
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
+    set_basic_config(request, info)
 
     api_script_rtname =  "topcons2_wsdl"
     extlist = [".py"]
@@ -1679,32 +1533,16 @@ def help_wsdl_api(request):#{{{
         api_script_info_list.append([api_script_lang_list[i], api_script_basename, usage])
 
     info['api_script_info_list'] = api_script_info_list
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'],
+            info['divided_logfile_query'],
+            info['divided_logfile_finished_jobid'])
 
     return render(request, 'pred/help_wsdl_api.html', info)
 #}}}
 def download(request):#{{{
     info = {}
+    set_basic_config(request, info)
 
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
     info['zipfile_wholepackage'] = ""
     info['size_wholepackage'] = ""
     size_wholepackage = 0
@@ -1715,8 +1553,9 @@ def download(request):#{{{
         size_wholepackage_str = myfunc.Size_byte2human(size_wholepackage)
         info['size_wholepackage'] = size_wholepackage_str
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'],
+            info['divided_logfile_query'],
+            info['divided_logfile_finished_jobid'])
 
     return render(request, 'pred/download.html', info)
 #}}}
