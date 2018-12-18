@@ -21,6 +21,8 @@ import hashlib
 import shutil
 import sqlite3
 from datetime import datetime
+from dateutil import parser as dtparser
+from pytz import timezone
 progname =  os.path.basename(sys.argv[0])
 wspace = ''.join([" "]*len(progname))
 rundir = os.path.dirname(os.path.realpath(__file__))
@@ -50,6 +52,9 @@ contact_email = "nanjiang.shu@scilifelab.se"
 vip_user_list = [
         "nanjiang.shu@scilifelab.se"
         ]
+TZ = "Europe/Stockholm"
+os.environ['TZ'] = TZ
+FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
 
 # note that here the url should be without http://
 
@@ -132,8 +137,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     if hdl.failure:
         isOK = False
     else:
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-        rt_msg = myfunc.WriteFile(datetime, starttagfile)
+        date_str = time.strftime(FORMAT_DATETIME)
+        rt_msg = myfunc.WriteFile(date_str, starttagfile)
         cnt = 0
         origpath = os.getcwd()
         con = sqlite3.connect(db_cache_SCAMPI2MSA)
@@ -268,9 +273,9 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             g_params['runjob_err'].append(rt_msg)
 
     if not g_params['isOnlyGetCache'] or len(toRunDict) == 0:
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
+        date_str = time.strftime(FORMAT_DATETIME)
         if os.path.exists(finished_seq_file):
-            rt_msg = myfunc.WriteFile(datetime, finishtagfile)
+            rt_msg = myfunc.WriteFile(date_str, finishtagfile)
             if rt_msg:
                 g_params['runjob_err'].append(rt_msg)
 
@@ -302,45 +307,17 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         else:
             isSuccess = False
             failtagfile = "%s/runjob.failed"%(outpath)
-            datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-            rt_msg = myfunc.WriteFile(datetime, failtagfile)
-            if rt_msg:
-                g_params['runjob_err'].append(rt_msg)
+            webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
 # do not sendmail at the cloud VM
-        if (webserver_common.IsFrontEndNode(base_www_url) and
-                myfunc.IsValidEmailAddress(email)):
-            from_email = "info@scampi.bioinfo.se"
-            to_email = email
-            subject = "Your result for SCAMPI2 JOBID=%s"%(jobid)
-            if isSuccess:
-                bodytext = """
-    Your result is ready at %s/pred/result/%s
-
-    Thanks for using SCAMPI2-msa
-
-            """%(g_params['base_www_url'], jobid)
-            else:
-                bodytext="""
-    We are sorry that your job with jobid %s is failed.
-
-    Please contact %s if you have any questions.
-
-    Attached below is the error message:
-    %s
-                """%(jobid, contact_email, "\n".join(g_params['runjob_err']))
-            g_params['runjob_log'].append("Sendmail %s -> %s, %s"% (from_email, to_email, subject)) #debug
-            rtValue = myfunc.Sendmail(from_email, to_email, subject, bodytext)
-            if rtValue != 0:
-                g_params['runjob_err'].append("Sendmail to {} failed with status {}".format(to_email, rtValue))
-
-
-    if len(g_params['runjob_err']) > 0:
-        rt_msg = myfunc.WriteFile("\n".join(g_params['runjob_err'])+"\n", runjob_errfile, "w")
-        return 1
-
+    if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
+        webserver_common.SendEmail_on_finish(jobid, base_www_url,
+                finish_status, name_server="SCAMPI2-msa", from_email="SCAMPI@scampi.bioinfo.se",
+                to_email=email, contact_email=contact_email,
+                logfile=runjob_logfile, errfile=runjob_errfile)
     return 0
+
 #}}}
 def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     all_begin_time = time.time()
@@ -388,8 +365,8 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 
     if isOK:
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-        rt_msg = myfunc.WriteFile(datetime, starttagfile)
+        date_str = time.strftime(FORMAT_DATETIME)
+        rt_msg = myfunc.WriteFile(date_str, starttagfile)
 
         cmd = [runscript_single, infile,  tmp_outfile]
         cmdline = " ".join(cmd)
@@ -425,9 +402,9 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             if rt_msg:
                 g_params['runjob_err'].append(rt_msg)
 
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
+        date_str = time.strftime(FORMAT_DATETIME)
         if os.path.exists(outfile):
-            rt_msg = myfunc.WriteFile(datetime, finishtagfile)
+            rt_msg = myfunc.WriteFile(date_str, finishtagfile)
             if rt_msg:
                 g_params['runjob_err'].append(rt_msg)
 
@@ -438,41 +415,15 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     else:
         isSuccess = False
         failtagfile = "%s/runjob.failed"%(outpath)
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
-        rt_msg = myfunc.WriteFile(datetime, failtagfile)
-        if rt_msg:
-            g_params['runjob_err'].append(rt_msg)
+        webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
 # do not sendmail at the cloud VM
-    if myfunc.IsValidEmailAddress(email):
-        from_email = "info@scampi.bioinfo.se"
-        to_email = email
-        subject = "Your result for SCAMPI2 JOBID=%s"%(jobid)
-        if isSuccess:
-            bodytext = """
-Your result is ready at %s/pred/result/%s
-
-Thanks for using SCAMPI2 (SCAMPI-single)
-
-        """%(g_params['base_www_url'], jobid)
-        else:
-            bodytext="""
-We are sorry that your job with jobid %s is failed.
-
-Please contact %s if you have any questions.
-
-Attached below is the error message:
-%s
-            """%(jobid, contact_email, "\n".join(g_params['runjob_err']))
-        g_params['runjob_log'].append("Sendmail %s -> %s, %s"% (from_email, to_email, subject)) #debug
-        rtValue = myfunc.Sendmail(from_email, to_email, subject, bodytext)
-        if rtValue != 0:
-            g_params['runjob_err'].append("Sendmail to {} failed with status {}".format(to_email, rtValue))
-
-    if len(g_params['runjob_err']) > 0:
-        rt_msg = myfunc.WriteFile("\n".join(g_params['runjob_err'])+"\n", runjob_errfile, "w")
-        return 1
+    if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
+        webserver_common.SendEmail_on_finish(jobid, base_www_url,
+                finish_status, name_server="SCAMPI2-single", from_email="SCAMPI@scampi.bioinfo.se",
+                to_email=email, contact_email=contact_email,
+                logfile=runjob_logfile, errfile=runjob_errfile)
     return 0
 #}}}
 def main(g_params):#{{{

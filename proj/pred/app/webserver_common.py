@@ -309,6 +309,17 @@ def IsFrontEndNode(base_www_url):#{{{
         else:
             return True
 #}}}
+def WriteDateTimeTagFile(outfile, logfile, errfile):# {{{
+    if not os.path.exists(outfile):
+        date_str = time.strftime(FORMAT_DATETIME)
+        try:
+            myfunc.WriteFile(date_str, outfile)
+            msg = "Write tag file %s succeeded"%(outfile)
+            myfunc.WriteFile("[%s] %s\n"%(date_str, msg),  logfile, "a", True)
+        except Exception as e:
+            msg = "Failed to write to file %s with message: \"%s\""%(outfile, str(e))
+            myfunc.WriteFile("[%s] %s\n"%(date_str, msg),  errfile, "a", True)
+# }}}
 def ValidateQuery(request, query, g_params):#{{{
     query['errinfo_br'] = ""
     query['errinfo_content'] = ""
