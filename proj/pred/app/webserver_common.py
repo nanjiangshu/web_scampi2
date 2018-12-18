@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Description:
 #   A collection of classes and functions used by web-servers
@@ -11,9 +11,18 @@
 import os
 import sys
 import myfunc
-import datetime
+import re
 import tabulate
 import logging
+from datetime import datetime
+from dateutil import parser as dtparser
+from pytz import timezone
+import time
+import shutil
+import subprocess
+TZ = "Europe/Stockholm"
+FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
+
 def WriteSubconsTextResultFile(outfile, outpath_result, maplist,#{{{
         runtime_in_sec, base_www_url, statfile=""):
     try:
@@ -21,10 +30,10 @@ def WriteSubconsTextResultFile(outfile, outpath_result, maplist,#{{{
         if statfile != "":
             fpstat = open(statfile, "w")
 
-        date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        date_str = time.strftime(FORMAT_DATETIME)
         print >> fpout, "##############################################################################"
         print >> fpout, "Subcons result file"
-        print >> fpout, "Generated from %s at %s"%(base_www_url, date)
+        print >> fpout, "Generated from %s at %s"%(base_www_url, date_str)
         print >> fpout, "Total request time: %.1f seconds."%(runtime_in_sec)
         print >> fpout, "##############################################################################"
         cnt = 0
@@ -40,7 +49,7 @@ def WriteSubconsTextResultFile(outfile, outpath_result, maplist,#{{{
             print >> fpout, "Sequence length: %d aa."%(length)
             print >> fpout, "Sequence:\n%s\n\n"%(seq)
 
-            rstfile = "%s/%s/%s/query_0_final.csv"%(outpath_result, subfoldername, "plot")
+            rstfile = "%s/%s/%s/query_0.csv"%(outpath_result, subfoldername, "plot")
 
             if os.path.exists(rstfile):
                 content = myfunc.ReadFile(rstfile).strip()
@@ -147,6 +156,49 @@ def GetLocDef(predfile):#{{{
 
     return (loc_def, loc_def_score)
 #}}}
+def datetime_str_to_epoch(date_str):# {{{
+    """convert the date_time in string to epoch
+    The string of date_time may with or without the zone info
+    """
+    return dtparser.parse(date_str).strftime("%s")
+# }}}
+def datetime_str_to_time(date_str):# {{{
+    """convert the date_time in string to datetime type
+    The string of date_time may with or without the zone info
+    """
+    strs = date_str.split()
+    dt = dtparser.parse(date_str)
+    if len(strs) == 2:
+        dt = dt.replace(tzinfo=timezone('UTC'))
+    return dt
+# }}}
+def RunCmd(cmd, logfile, errfile, verbose=False):# {{{
+    """Input cmd in list
+       Run the command and also output message to logs
+    """
+    begin_time = time.time()
+
+    isCmdSuccess = False
+    cmdline = " ".join(cmd)
+    date_str = time.strftime(FORMAT_DATETIME)
+    rmsg = ""
+    try:
+        rmsg = subprocess.check_output(cmd)
+        if verbose:
+            msg = "workflow: %s"%(cmdline)
+            myfunc.WriteFile("[%s] %s\n"%(date_str, msg),  logfile, "a", True)
+        isCmdSuccess = True
+    except subprocess.CalledProcessError, e:
+        msg = "cmdline: %s\nFailed with message \"%s\""%(cmdline, str(e))
+        myfunc.WriteFile("[%s] %s\n"%(date_str, msg),  errfile, "a", True)
+        isCmdSuccess = False
+        pass
+
+    end_time = time.time()
+    runtime_in_sec = end_time - begin_time
+
+    return (isCmdSuccess, runtime_in_sec)
+# }}}
 def IsFrontEndNode(base_www_url):#{{{
     """
     check if the base_www_url is front-end node
@@ -164,6 +216,225 @@ def IsFrontEndNode(base_www_url):#{{{
             return False
         else:
             return True
+#}}}
+def ValidateQuery(request, query, g_params):#{{{
+    query['errinfo_br'] = ""
+    query['errinfo_content'] = ""
+    query['warninfo'] = ""
+
+    has_pasted_seq = False
+    has_upload_file = False
+    if query['rawseq'].strip() != "":
+        has_pasted_seq = True
+    if query['seqfile'] != "":
+        has_upload_file = True
+
+    if has_pasted_seq and has_upload_file:
+        query['errinfo_br'] += "Confused input!"
+        query['errinfo_content'] = "You should input your query by either "\
+                "paste the sequence in the text area or upload a file."
+        return False
+    elif not has_pasted_seq and not has_upload_file:
+        query['errinfo_br'] += "No input!"
+        query['errinfo_content'] = "You should input your query by either "\
+                "paste the sequence in the text area or upload a file "
+        return False
+    elif query['seqfile'] != "":
+        try:
+            fp = request.FILES['seqfile']
+            fp.seek(0,2)
+            filesize = fp.tell()
+            if filesize > g_params['MAXSIZE_UPLOAD_FILE_IN_BYTE']:
+                query['errinfo_br'] += "Size of uploaded file exceeds limit!"
+                query['errinfo_content'] += "The file you uploaded exceeds "\
+                        "the upper limit %g Mb. Please split your file and "\
+                        "upload again."%(g_params['MAXSIZE_UPLOAD_FILE_IN_MB'])
+                return False
+
+            fp.seek(0,0)
+            content = fp.read()
+        except KeyError:
+            query['errinfo_br'] += ""
+            query['errinfo_content'] += """
+            Failed to read uploaded file \"%s\"
+            """%(query['seqfile'])
+            return False
+        query['rawseq'] = content
+
+    query['filtered_seq'] = ValidateSeq(query['rawseq'], query, g_params)
+    is_valid = query['isValidSeq']
+    return is_valid
+#}}}
+def ValidateSeq(rawseq, seqinfo, g_params):#{{{
+# seq is the chunk of fasta file
+# seqinfo is a dictionary
+# return (filtered_seq)
+    rawseq = re.sub(r'[^\x00-\x7f]',r' ',rawseq) # remove non-ASCII characters
+    rawseq = re.sub(r'[\x0b]',r' ',rawseq) # filter invalid characters for XML
+    filtered_seq = ""
+    # initialization
+    for item in ['errinfo_br', 'errinfo', 'errinfo_content', 'warninfo']:
+        if item not in seqinfo:
+            seqinfo[item] = ""
+
+    seqinfo['isValidSeq'] = True
+
+    seqRecordList = []
+    myfunc.ReadFastaFromBuffer(rawseq, seqRecordList, True, 0, 0)
+# filter empty sequences and any sequeces shorter than MIN_LEN_SEQ or longer
+# than MAX_LEN_SEQ
+    newSeqRecordList = []
+    li_warn_info = []
+    isHasEmptySeq = False
+    isHasShortSeq = False
+    isHasLongSeq = False
+    isHasDNASeq = False
+    cnt = 0
+    for rd in seqRecordList:
+        seq = rd[2].strip()
+        seqid = rd[0].strip()
+        if len(seq) == 0:
+            isHasEmptySeq = 1
+            msg = "Empty sequence %s (SeqNo. %d) is removed."%(seqid, cnt+1)
+            li_warn_info.append(msg)
+        elif len(seq) < g_params['MIN_LEN_SEQ']:
+            isHasShortSeq = 1
+            msg = "Sequence %s (SeqNo. %d) is removed since its length is < %d."%(seqid, cnt+1, g_params['MIN_LEN_SEQ'])
+            li_warn_info.append(msg)
+        elif len(seq) > g_params['MAX_LEN_SEQ']:
+            isHasLongSeq = True
+            msg = "Sequence %s (SeqNo. %d) is removed since its length is > %d."%(seqid, cnt+1, g_params['MAX_LEN_SEQ'])
+            li_warn_info.append(msg)
+        elif myfunc.IsDNASeq(seq):
+            isHasDNASeq = True
+            msg = "Sequence %s (SeqNo. %d) is removed since it looks like a DNA sequence."%(seqid, cnt+1)
+            li_warn_info.append(msg)
+        else:
+            newSeqRecordList.append(rd)
+        cnt += 1
+    seqRecordList = newSeqRecordList
+
+    numseq = len(seqRecordList)
+
+    if numseq < 1:
+        seqinfo['errinfo_br'] += "Number of input sequences is 0!\n"
+        t_rawseq = rawseq.lstrip()
+        if t_rawseq and t_rawseq[0] != '>':
+            seqinfo['errinfo_content'] += "Bad input format. The FASTA format should have an annotation line start with '>'.\n"
+        if len(li_warn_info) >0:
+            seqinfo['errinfo_content'] += "\n".join(li_warn_info) + "\n"
+        if not isHasShortSeq and not isHasEmptySeq and not isHasLongSeq and not isHasDNASeq:
+            seqinfo['errinfo_content'] += "Please input your sequence in FASTA format.\n"
+
+        seqinfo['isValidSeq'] = False
+    elif numseq > g_params['MAX_NUMSEQ_PER_JOB']:
+        seqinfo['errinfo_br'] += "Number of input sequences exceeds the maximum (%d)!\n"%(
+                g_params['MAX_NUMSEQ_PER_JOB'])
+        seqinfo['errinfo_content'] += "Your query has %d sequences. "%(numseq)
+        seqinfo['errinfo_content'] += "However, the maximal allowed sequences per job is %d. "%(
+                g_params['MAX_NUMSEQ_PER_JOB'])
+        seqinfo['errinfo_content'] += "Please split your query into smaller files and submit again.\n"
+        seqinfo['isValidSeq'] = False
+    else:
+        li_badseq_info = []
+        if 'isForceRun' in seqinfo and seqinfo['isForceRun'] and numseq > g_params['MAX_NUMSEQ_FOR_FORCE_RUN']:
+            seqinfo['errinfo_br'] += "Invalid input!"
+            seqinfo['errinfo_content'] += "You have chosen the \"Force Run\" mode. "\
+                    "The maximum allowable number of sequences of a job is %d. "\
+                    "However, your input has %d sequences."%(g_params['MAX_NUMSEQ_FOR_FORCE_RUN'], numseq)
+            seqinfo['isValidSeq'] = False
+
+
+# checking for bad sequences in the query
+
+    if seqinfo['isValidSeq']:
+        for i in xrange(numseq):
+            seq = seqRecordList[i][2].strip()
+            anno = seqRecordList[i][1].strip().replace('\t', ' ')
+            seqid = seqRecordList[i][0].strip()
+            seq = seq.upper()
+            seq = re.sub("[\s\n\r\t]", '', seq)
+            li1 = [m.start() for m in re.finditer("[^ABCDEFGHIKLMNPQRSTUVWYZX*-]", seq)]
+            if len(li1) > 0:
+                for j in xrange(len(li1)):
+                    msg = "Bad letter for amino acid in sequence %s (SeqNo. %d) "\
+                            "at position %d (letter: '%s')"%(seqid, i+1,
+                                    li1[j]+1, seq[li1[j]])
+                    li_badseq_info.append(msg)
+
+        if len(li_badseq_info) > 0:
+            seqinfo['errinfo_br'] += "There are bad letters for amino acids in your query!\n"
+            seqinfo['errinfo_content'] = "\n".join(li_badseq_info) + "\n"
+            seqinfo['isValidSeq'] = False
+
+# convert some non-classical letters to the standard amino acid symbols
+# Scheme:
+#    out of these 26 letters in the alphabet, 
+#    B, Z -> X
+#    U -> C
+#    *, - will be deleted
+    if seqinfo['isValidSeq']:
+        li_newseq = []
+        for i in xrange(numseq):
+            seq = seqRecordList[i][2].strip()
+            anno = seqRecordList[i][1].strip()
+            seqid = seqRecordList[i][0].strip()
+            seq = seq.upper()
+            seq = re.sub("[\s\n\r\t]", '', seq)
+            anno = anno.replace('\t', ' ') #replace tab by whitespace
+
+
+            li1 = [m.start() for m in re.finditer("[BZ]", seq)]
+            if len(li1) > 0:
+                for j in xrange(len(li1)):
+                    msg = "Amino acid in sequence %s (SeqNo. %d) at position %d "\
+                            "(letter: '%s') has been replaced by 'X'"%(seqid,
+                                    i+1, li1[j]+1, seq[li1[j]])
+                    li_warn_info.append(msg)
+                seq = re.sub("[BZ]", "X", seq)
+
+            li1 = [m.start() for m in re.finditer("[U]", seq)]
+            if len(li1) > 0:
+                for j in xrange(len(li1)):
+                    msg = "Amino acid in sequence %s (SeqNo. %d) at position %d "\
+                            "(letter: '%s') has been replaced by 'C'"%(seqid,
+                                    i+1, li1[j]+1, seq[li1[j]])
+                    li_warn_info.append(msg)
+                seq = re.sub("[U]", "C", seq)
+
+            li1 = [m.start() for m in re.finditer("[*]", seq)]
+            if len(li1) > 0:
+                for j in xrange(len(li1)):
+                    msg = "Translational stop in sequence %s (SeqNo. %d) at position %d "\
+                            "(letter: '%s') has been deleted"%(seqid,
+                                    i+1, li1[j]+1, seq[li1[j]])
+                    li_warn_info.append(msg)
+                seq = re.sub("[*]", "", seq)
+
+            li1 = [m.start() for m in re.finditer("[-]", seq)]
+            if len(li1) > 0:
+                for j in xrange(len(li1)):
+                    msg = "Gap in sequence %s (SeqNo. %d) at position %d "\
+                            "(letter: '%s') has been deleted"%(seqid,
+                                    i+1, li1[j]+1, seq[li1[j]])
+                    li_warn_info.append(msg)
+                seq = re.sub("[-]", "", seq)
+
+            # check the sequence length again after potential removal of
+            # translation stop
+            if len(seq) < g_params['MIN_LEN_SEQ']:
+                isHasShortSeq = 1
+                msg = "Sequence %s (SeqNo. %d) is removed since its length is < %d (after removal of translation stop)."%(seqid, i+1, g_params['MIN_LEN_SEQ'])
+                li_warn_info.append(msg)
+            else:
+                li_newseq.append(">%s\n%s"%(anno, seq))
+
+        filtered_seq = "\n".join(li_newseq) # seq content after validation
+        seqinfo['numseq'] = len(li_newseq)
+        seqinfo['warninfo'] = "\n".join(li_warn_info) + "\n"
+
+    seqinfo['errinfo'] = seqinfo['errinfo_br'] + seqinfo['errinfo_content']
+    return filtered_seq
 #}}}
 
 def GetAverageNewRunTime(finished_seq_file, window=100):#{{{

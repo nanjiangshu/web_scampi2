@@ -27,12 +27,16 @@ import tempfile
 import re
 import subprocess
 from datetime import datetime
+from dateutil import parser as dtparser
+from pytz import timezone
 import time
 import math
 import shutil
 import json
 
-os.environ['TZ'] = 'Europe/Stockholm'
+TZ = "Europe/Stockholm"
+os.environ['TZ'] = TZ
+FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
 time.tzset()
 
 from django.core.exceptions import ValidationError
@@ -46,23 +50,28 @@ from django.contrib.auth import authenticate, login, logout
 from django.conf import settings
 
 # global parameters
-BASEURL = "/pred/";
-MAXSIZE_UPLOAD_FILE_IN_MB = 100
-MAXSIZE_UPLOAD_FILE_IN_BYTE = MAXSIZE_UPLOAD_FILE_IN_MB * 1024*1024
-MAX_DAYS_TO_SHOW = 30
-BIG_NUMBER = 100000
-MAX_NUMSEQ_FOR_FORCE_RUN = 100
+g_params = {}
+g_params['BASEURL'] = "/pred/";
+g_params['MAXSIZE_UPLOAD_FILE_IN_MB'] = 100
+g_params['MAXSIZE_UPLOAD_FILE_IN_BYTE'] = g_params['MAXSIZE_UPLOAD_FILE_IN_MB'] * 1024*1024
+g_params['MAX_DAYS_TO_SHOW'] = 100000
+g_params['BIG_NUMBER'] = 100000
+g_params['MAX_NUMSEQ_FOR_FORCE_RUN'] = 100
+g_params['MAX_ALLOWD_NUMSEQ_single'] = 100000
+g_params['MAX_ALLOWD_NUMSEQ_msa'] = 100
+g_params['MIN_LEN_SEQ']=10
+g_params['MAX_LEN_SEQ']=10000
+
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 progname =  os.path.basename(__file__)
+rootname_progname = os.path.splitext(progname)[0]
 path_app = "%s/app"%(SITE_ROOT)
 sys.path.append(path_app)
 path_log = "%s/static/log"%(SITE_ROOT)
-gen_logfile = "%s/static/log/%s.log"%(SITE_ROOT, progname)
-MAX_ALLOWD_NUMSEQ_single = 100000
-MAX_ALLOWD_NUMSEQ_msa = 100
-MIN_LEN_SEQ=10
-MAX_LEN_SEQ=10000
+path_stat = "%s/stat"%(path_log)
 path_result = "%s/static/result"%(SITE_ROOT)
+path_tmp = "%s/static/tmp"%(SITE_ROOT)
+path_md5 = "%s/static/md5"%(SITE_ROOT)
 
 suq_basedir = "/tmp"
 if os.path.exists("/scratch"):
@@ -112,268 +121,31 @@ def set_basic_config(request, info):# {{{
         divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
                 "static/log/divided", "%s_failed_job.log"%(client_ip))
 
+    if isSuperUser:
+        info['MAX_DAYS_TO_SHOW'] = g_params['BIG_NUMBER']
+    else:
+        info['MAX_DAYS_TO_SHOW'] = g_params['MAX_DAYS_TO_SHOW']
+
+
     info['username'] = username
     info['isSuperUser'] = isSuperUser
     info['divided_logfile_query'] = divided_logfile_query
     info['divided_logfile_finished_jobid'] = divided_logfile_finished_jobid
     info['client_ip'] = client_ip
-    info['BASEURL'] = BASEURL
+    info['BASEURL'] = g_params['BASEURL']
     info['STATIC_URL'] = settings.STATIC_URL
 # }}}
-def index(request):#{{{
-    path_tmp = "%s/static/tmp"%(SITE_ROOT)
-    path_md5 = "%s/static/md5"%(SITE_ROOT)
-    if not os.path.exists(path_result):
-        os.mkdir(path_result, 0755)
-    if not os.path.exists(path_result):
-        os.mkdir(path_tmp, 0755)
-    if not os.path.exists(path_md5):
-        os.mkdir(path_md5, 0755)
-    base_www_url_file = "%s/static/log/base_www_url.txt"%(SITE_ROOT)
-    if not os.path.exists(base_www_url_file):
-        base_www_url = "http://" + request.META['HTTP_HOST']
-        myfunc.WriteFile(base_www_url, base_www_url_file, "w", True)
-    return submit_seq(request)
-#}}}
-def SetColorStatus(status):#{{{
-    if status == "Finished":
-        return "green"
-    elif status == "Failed":
-        return "red"
-    elif status == "Running":
-        return "blue"
-    else:
-        return "black"
-#}}}
-def submit_seq(request):#{{{
-    info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-    # if this is a POST request we need to process the form data
-    if request.method == 'POST':
-        # create a form instance and populate it with data from the request:
-        form = SubmissionForm(request.POST)
-        # check whether it's valid:
-        if form.is_valid():
-            # process the data in form.cleaned_data as required
-            # redirect to a new URL:
-
-            jobname = request.POST['jobname']
-            email = request.POST['email']
-            rawseq = request.POST['rawseq'] + "\n" # force add a new line
-            Nfix = ""
-            Cfix = ""
-            fix_str = ""
-            isForceRun = False
-            try:
-                Nfix = request.POST['Nfix']
-            except:
-                pass
-            try:
-                Cfix = request.POST['Cfix']
-            except:
-                pass
-            try:
-                fix_str = request.POST['fix_str']
-            except:
-                pass
-
-            app_type = "SCAMPI-single"
-            if "domsa" in request.POST and request.POST['domsa'] == "Submit SCAMPI-msa":
-                app_type = "SCAMPI-msa"
-            else:
-                app_type = "SCAMPI-single"
-
-            if 'forcerun' in request.POST:
-                isForceRun = True
-
-#             print "request.POST=\n", request.POST, "\n"
-#             print "request.POST.getlist=", request.POST.getlist('forcerun'), "\n"
-#             print "Nfix=", Nfix
-#             print "Cfix=", Cfix
-#             print "fix_str=", fix_str
-#             print "isForceRun=", isForceRun
-
-            try:
-                seqfile = request.FILES['seqfile']
-            except KeyError, MultiValueDictKeyError:
-                seqfile = ""
-            date = time.strftime("%Y-%m-%d %H:%M:%S")
-            query = {}
-            query['rawseq'] = rawseq
-            query['seqfile'] = seqfile
-            query['email'] = email
-            query['jobname'] = jobname
-            query['date'] = date
-            query['client_ip'] = client_ip
-            query['errinfo'] = ""
-            query['method_submission'] = "web"
-            query['app_type'] = app_type
-            query['Nfix'] = Nfix
-            query['Cfix'] = Cfix
-            query['fix_str'] = fix_str
-            query['isForceRun'] = isForceRun
-            query['username'] = username
-
-            is_valid = ValidateQuery(request, query)
-
-            if is_valid:
-                jobid = RunQuery(request, query)
-
-                # type of method_submission can be web or wsdl
-                #date, jobid, IP, numseq, size, jobname, email, method_submission
-                log_record = "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n"%(query['date'], jobid,
-                        query['client_ip'], query['numseq'],
-                        len(query['rawseq']),query['jobname'], query['email'],
-                        query['method_submission'], query['app_type'])
-                main_logfile_query = "%s/%s/%s"%(SITE_ROOT, "static/log", "submitted_seq.log")
-                myfunc.WriteFile(log_record, main_logfile_query, "a")
-
-                divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                        "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-                divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                        "static/log/divided", "%s_finished_job.log"%(client_ip))
-                if client_ip != "":
-                    myfunc.WriteFile(log_record, divided_logfile_query, "a")
-
-
-                file_seq_warning = "%s/%s/%s/%s"%(SITE_ROOT, "static/result", jobid, "query.warn.txt")
-                query['file_seq_warning'] = os.path.basename(file_seq_warning)
-                if query['warninfo'] != "":
-                    myfunc.WriteFile(query['warninfo'], file_seq_warning, "a")
-
-                query['jobid'] = jobid
-                query['raw_query_seqfile'] = "query.raw.fa"
-                query['BASEURL'] = BASEURL
-
-                # start the qd_fe if not, in the background
-                cmd = [qd_fe_scriptfile]
-                base_www_url = "http://" + request.META['HTTP_HOST']
-                # run the daemon only at the frontend
-                if webserver_common.IsFrontEndNode(base_www_url):
-                    cmd = "nohup %s %s &"%(python_exec, qd_fe_scriptfile)
-                    os.system(cmd)
-
-                if query['numseq'] < 0: #go to result page anyway
-                    query['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-                            divided_logfile_query, divided_logfile_finished_jobid)
-                    return render(request, 'pred/thanks.html', query)
-                else:
-                    return get_results(request, jobid)
-
-            else:
-                query['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-                        divided_logfile_query, divided_logfile_finished_jobid)
-                return render(request, 'pred/badquery.html', query)
-
-    # if a GET (or any other method) we'll create a blank form
-    else:
-        form = SubmissionForm()
-
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    jobcounter = GetJobCounter(client_ip, isSuperUser, divided_logfile_query,
-            divided_logfile_finished_jobid)
-    info['form'] = form
-    info['MAX_ALLOWD_NUMSEQ_msa'] = MAX_ALLOWD_NUMSEQ_msa
-    info['MAX_ALLOWD_NUMSEQ_single'] = MAX_ALLOWD_NUMSEQ_single
-    info['jobcounter'] = jobcounter
-    return render(request, 'pred/submit_seq.html', info)
-#}}}
-def get_job_status(jobid):#{{{
-    status = "";
-    rstdir = "%s/%s"%(path_result, jobid)
-    starttagfile = "%s/%s"%(rstdir, "runjob.start")
-    finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
-    failedtagfile = "%s/%s"%(rstdir, "runjob.failed")
-    if os.path.exists(failedtagfile):
-        status = "Failed"
-    elif os.path.exists(finishtagfile):
-        status = "Finished"
-    elif os.path.exists(starttagfile):
-        status = "Running"
-    elif os.path.exists(rstdir):
-        status = "Wait"
-    return status
-#}}}
-
-def login(request):#{{{
-    #logout(request)
-    info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser, divided_logfile_query, divided_logfile_finished_jobid)
-    return render(request, 'pred/login.html', info)
-#}}}
-def WaitForResult(jobid, MAX_WAIT_TIME=2):#{{{
-# if the running time is shorter than MAX_WAIT_TIME seconds, go directly to the
-# result page, other wise, show the link information
-    finishtagfile = "%s/%s/%s/%s"%(SITE_ROOT, "static/result", jobid, "runjob.finish")
-
-    cnt_time = 0
-    interval = 0.1
-    while 1:
-        if not os.path.exists(finishtagfile):
-            time.sleep(interval)
-            cnt_time += interval
-        else:
-            break
-        if cnt_time > MAX_WAIT_TIME:
-            break
-#}}}
-def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
-        logfile_finished_jobid):
+def GetJobCounter(info): #{{{
 # get job counter for the client_ip
 # get the table from runlog, 
 # for queued or running jobs, if source=web and numseq=1, check again the tag file in
 # each individual folder, since they are queued locally
+    logfile_query = info['divided_logfile_query']
+    logfile_finished_jobid = info['divided_logfile_finished_jobid']
+    isSuperUser = info['isSuperUser']
+    client_ip = info['client_ip']
+    maxdaystoshow = info['MAX_DAYS_TO_SHOW']
+
     jobcounter = {}
 
     jobcounter['queued'] = 0
@@ -387,13 +159,6 @@ def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
     jobcounter['finished_idlist'] = []
     jobcounter['failed_idlist'] = []
     jobcounter['nojobfolder_idlist'] = []
-
-
-    if isSuperUser:
-        maxdaystoshow = BIG_NUMBER
-    else:
-        maxdaystoshow = MAX_DAYS_TO_SHOW
-
 
     hdl = myfunc.ReadLineByBlock(logfile_query)
     if hdl.failure:
@@ -410,7 +175,7 @@ def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
             elif status == "Failed":
                 failed_jobid_set.add(jobid)
         lines = hdl.readlines()
-        current_time = datetime.now()
+        current_time = datetime.now(timezone(TZ))
         while lines != None:
             for line in lines:
                 strs = line.split("\t")
@@ -423,8 +188,7 @@ def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = datetime.strptime(submit_date_str, 
-                            "%Y-%m-%d %H:%M:%S")
+                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
 
@@ -466,6 +230,208 @@ def GetJobCounter(client_ip, isSuperUser, logfile_query, #{{{
         hdl.close()
     return jobcounter
 #}}}
+def index(request):#{{{
+    path_tmp = "%s/static/tmp"%(SITE_ROOT)
+    path_md5 = "%s/static/md5"%(SITE_ROOT)
+    if not os.path.exists(path_result):
+        os.mkdir(path_result, 0755)
+    if not os.path.exists(path_result):
+        os.mkdir(path_tmp, 0755)
+    if not os.path.exists(path_md5):
+        os.mkdir(path_md5, 0755)
+    base_www_url_file = "%s/static/log/base_www_url.txt"%(SITE_ROOT)
+    if not os.path.exists(base_www_url_file):
+        base_www_url = "http://" + request.META['HTTP_HOST']
+        myfunc.WriteFile(base_www_url, base_www_url_file, "w", True)
+
+    # read the local config file if exists
+    configfile = "%s/config/config.json"%(SITE_ROOT)
+    config = {}
+    if os.path.exists(configfile):
+        text = myfunc.ReadFile(configfile)
+        config = json.loads(text)
+
+    if rootname_progname in config:
+        g_params.update(config[rootname_progname])
+        g_params['MAXSIZE_UPLOAD_FILE_IN_BYTE'] = g_params['MAXSIZE_UPLOAD_FILE_IN_MB'] * 1024*1024
+
+    return submit_seq(request)
+#}}}
+def SetColorStatus(status):#{{{
+    if status == "Finished":
+        return "green"
+    elif status == "Failed":
+        return "red"
+    elif status == "Running":
+        return "blue"
+    else:
+        return "black"
+#}}}
+def submit_seq(request):#{{{
+    info = {}
+    set_basic_config(request, info)
+
+    # if this is a POST request we need to process the form data
+    if request.method == 'POST':
+        # create a form instance and populate it with data from the request:
+        form = SubmissionForm(request.POST)
+        # check whether it's valid:
+        if form.is_valid():
+            # process the data in form.cleaned_data as required
+            # redirect to a new URL:
+
+            jobname = request.POST['jobname']
+            email = request.POST['email']
+            rawseq = request.POST['rawseq'] + "\n" # force add a new line
+            Nfix = ""
+            Cfix = ""
+            fix_str = ""
+            isForceRun = False
+            try:
+                Nfix = request.POST['Nfix']
+            except:
+                pass
+            try:
+                Cfix = request.POST['Cfix']
+            except:
+                pass
+            try:
+                fix_str = request.POST['fix_str']
+            except:
+                pass
+
+            app_type = "SCAMPI-single"
+            if "domsa" in request.POST and request.POST['domsa'] == "Submit SCAMPI-msa":
+                app_type = "SCAMPI-msa"
+                g_params['MAX_NUMSEQ_PER_JOB'] = g_params['MAX_ALLOWD_NUMSEQ_msa']
+            else:
+                app_type = "SCAMPI-single"
+                g_params['MAX_NUMSEQ_PER_JOB'] = g_params['MAX_ALLOWD_NUMSEQ_single']
+
+            if 'forcerun' in request.POST:
+                isForceRun = True
+
+            try:
+                seqfile = request.FILES['seqfile']
+            except KeyError, MultiValueDictKeyError:
+                seqfile = ""
+            date_str = time.strftime(FORMAT_DATETIME)
+            query = {}
+            query['rawseq'] = rawseq
+            query['seqfile'] = seqfile
+            query['email'] = email
+            query['jobname'] = jobname
+            query['date'] = date_str
+            query['client_ip'] = info['client_ip']
+            query['errinfo'] = ""
+            query['method_submission'] = "web"
+            query['app_type'] = app_type
+            query['Nfix'] = Nfix
+            query['Cfix'] = Cfix
+            query['fix_str'] = fix_str
+            query['isForceRun'] = isForceRun
+            query['username'] = info['username']
+            query['STATIC_URL'] = settings.STATIC_URL
+
+            is_valid = webserver_common.ValidateQuery(request, query, g_params)
+
+            if is_valid:
+                jobid = RunQuery(request, query)
+
+                # type of method_submission can be web or wsdl
+                #date, jobid, IP, numseq, size, jobname, email, method_submission
+                log_record = "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n"%(query['date'], jobid,
+                        query['client_ip'], query['numseq'],
+                        len(query['rawseq']),query['jobname'], query['email'],
+                        query['method_submission'], query['app_type'])
+                main_logfile_query = "%s/%s/%s"%(SITE_ROOT, "static/log", "submitted_seq.log")
+                myfunc.WriteFile(log_record, main_logfile_query, "a")
+
+                divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
+                        "static/log/divided", "%s_submitted_seq.log"%(query['client_ip']))
+                divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
+                        "static/log/divided", "%s_finished_job.log"%(query['client_ip']))
+                if query['client_ip'] != "":
+                    myfunc.WriteFile(log_record, divided_logfile_query, "a", True)
+
+
+                file_seq_warning = "%s/%s/%s/%s"%(SITE_ROOT, "static/result", jobid, "query.warn.txt")
+                query['file_seq_warning'] = os.path.basename(file_seq_warning)
+                if query['warninfo'] != "":
+                    myfunc.WriteFile(query['warninfo'], file_seq_warning, "a")
+
+                query['jobid'] = jobid
+                query['raw_query_seqfile'] = "query.raw.fa"
+                query['BASEURL'] = g_params['BASEURL']
+
+                # start the qd_fe if not, in the background
+                cmd = [qd_fe_scriptfile]
+                base_www_url = "http://" + request.META['HTTP_HOST']
+                # run the daemon only at the frontend
+                if webserver_common.IsFrontEndNode(base_www_url):
+                    cmd = "nohup %s %s &"%(python_exec, qd_fe_scriptfile)
+                    os.system(cmd)
+
+                if query['numseq'] < 0: #go to result page anyway
+                    query['jobcounter'] = GetJobCounter(info)
+                    return render(request, 'pred/thanks.html', query)
+                else:
+                    return get_results(request, jobid)
+
+            else:
+                query['jobcounter'] = GetJobCounter(info)
+                return render(request, 'pred/badquery.html', query)
+
+    # if a GET (or any other method) we'll create a blank form
+    else:
+        form = SubmissionForm()
+
+    info['jobcounter'] = GetJobCounter(info)
+    info['form'] = form
+    info['MAX_ALLOWD_NUMSEQ_msa'] = g_params['MAX_ALLOWD_NUMSEQ_msa']
+    info['MAX_ALLOWD_NUMSEQ_single'] = g_params['MAX_ALLOWD_NUMSEQ_single']
+    return render(request, 'pred/submit_seq.html', info)
+#}}}
+def get_job_status(jobid):#{{{
+    status = "";
+    rstdir = "%s/%s"%(path_result, jobid)
+    starttagfile = "%s/%s"%(rstdir, "runjob.start")
+    finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
+    failedtagfile = "%s/%s"%(rstdir, "runjob.failed")
+    if os.path.exists(failedtagfile):
+        status = "Failed"
+    elif os.path.exists(finishtagfile):
+        status = "Finished"
+    elif os.path.exists(starttagfile):
+        status = "Running"
+    elif os.path.exists(rstdir):
+        status = "Wait"
+    return status
+#}}}
+
+def login(request):#{{{
+    #logout(request)
+    info = {}
+    set_basic_config(request, info)
+    info['jobcounter'] = GetJobCounter(info)
+    return render(request, 'pred/login.html', info)
+#}}}
+def WaitForResult(jobid, MAX_WAIT_TIME=2):#{{{
+# if the running time is shorter than MAX_WAIT_TIME seconds, go directly to the
+# result page, other wise, show the link information
+    finishtagfile = "%s/%s/%s/%s"%(SITE_ROOT, "static/result", jobid, "runjob.finish")
+
+    cnt_time = 0
+    interval = 0.1
+    while 1:
+        if not os.path.exists(finishtagfile):
+            time.sleep(interval)
+            cnt_time += interval
+        else:
+            break
+        if cnt_time > MAX_WAIT_TIME:
+            break
+#}}}
 def GetNumSameUserInQueue(rstdir, host_ip, email):#{{{
     numseq_this_user = 1
     logfile = "%s/runjob.log"%(rstdir)
@@ -488,208 +454,6 @@ def GetNumSameUserInQueue(rstdir, host_ip, email):#{{{
     return numseq_this_user
 #}}}
 
-def ValidateQuery(request, query):#{{{
-    query['errinfo_br'] = ""
-    query['errinfo_content'] = ""
-    query['warninfo'] = ""
-
-    has_pasted_seq = False
-    has_upload_file = False
-    if query['rawseq'].strip() != "":
-        has_pasted_seq = True
-    if query['seqfile'] != "":
-        has_upload_file = True
-
-    if has_pasted_seq and has_upload_file:
-        query['errinfo_br'] += "Confused input!"
-        query['errinfo_content'] = "You should input your query by either "\
-                "paste the sequence in the text area or upload a file."
-        return False
-    elif not has_pasted_seq and not has_upload_file:
-        query['errinfo_br'] += "No input!"
-        query['errinfo_content'] = "You should input your query by either "\
-                "paste the sequence in the text area or upload a file "
-        return False
-    elif query['seqfile'] != "":
-        try:
-            fp = request.FILES['seqfile']
-            fp.seek(0,2)
-            filesize = fp.tell()
-            if filesize > MAXSIZE_UPLOAD_FILE_IN_BYTE:
-                query['errinfo_br'] += "Size of uploaded file exceeds limit!"
-                query['errinfo_content'] += "The file you uploaded exceeds "\
-                        "the upper limit %g Mb. Please split your file and "\
-                        "upload again."%(MAXSIZE_UPLOAD_FILE_IN_MB)
-                return False
-
-            fp.seek(0,0)
-            content = fp.read()
-        except KeyError:
-            query['errinfo_br'] += ""
-            query['errinfo_content'] += """
-            Failed to read uploaded file \"%s\"
-            """%(query['seqfile'])
-            return False
-        query['rawseq'] = content
-
-    query['filtered_seq'] = ValidateSeq(query['rawseq'], query)
-    is_valid = query['isValidSeq']
-    return is_valid
-#}}}
-def ValidateSeq(rawseq, seqinfo):#{{{
-# seq is the chunk of fasta file
-# seqinfo is a dictionary
-# return (filtered_seq)
-    rawseq = re.sub(r'[^\x00-\x7f]',r' ',rawseq) # remove non-ASCII characters
-    filtered_seq = ""
-    # initialization
-    for item in ['errinfo_br', 'errinfo', 'errinfo_content', 'warninfo']:
-        if item not in seqinfo:
-            seqinfo[item] = ""
-
-    seqinfo['isValidSeq'] = True
-
-    seqRecordList = []
-    myfunc.ReadFastaFromBuffer(rawseq, seqRecordList, True, 0, 0)
-# filter empty sequences and any sequeces shorter than MIN_LEN_SEQ or longer
-# than MAX_LEN_SEQ
-    newSeqRecordList = []
-    li_warn_info = []
-    isHasEmptySeq = False
-    isHasShortSeq = False
-    isHasLongSeq = False
-    isHasDNASeq = False
-    cnt = 0
-    for rd in seqRecordList:
-        seq = rd[2].strip()
-        seqid = rd[0].strip()
-        if len(seq) == 0:
-            isHasEmptySeq = 1
-            msg = "Empty sequence %s (SeqNo. %d) is removed."%(seqid, cnt+1)
-            li_warn_info.append(msg)
-        elif len(seq) < MIN_LEN_SEQ:
-            isHasShortSeq = 1
-            msg = "Sequence %s (SeqNo. %d) is removed since its length is < %d."%(seqid, cnt+1, MIN_LEN_SEQ)
-            li_warn_info.append(msg)
-        elif len(seq) > MAX_LEN_SEQ:
-            isHasLongSeq = True
-            msg = "Sequence %s (SeqNo. %d) is removed since its length is > %d."%(seqid, cnt+1, MAX_LEN_SEQ)
-            li_warn_info.append(msg)
-        elif myfunc.IsDNASeq(seq):
-            isHasDNASeq = True
-            msg = "Sequence %s (SeqNo. %d) is removed since it looks like a DNA sequence."%(seqid, cnt+1)
-            li_warn_info.append(msg)
-        else:
-            newSeqRecordList.append(rd)
-        cnt += 1
-    seqRecordList = newSeqRecordList
-
-    numseq = len(seqRecordList)
-    seqinfo['numseq'] = numseq
-
-    if numseq < 1:
-        seqinfo['errinfo_br'] += "Number of input sequences is 0!\n"
-        t_rawseq = rawseq.lstrip()
-        if t_rawseq and t_rawseq[0] != '>':
-            seqinfo['errinfo_content'] += "Bad input format. The FASTA format should have an annotation line start with '>'.\n"
-        if len(li_warn_info) >0:
-            seqinfo['errinfo_content'] += "\n".join(li_warn_info) + "\n"
-        if not isHasShortSeq and not isHasEmptySeq and not isHasLongSeq and not isHasDNASeq:
-            seqinfo['errinfo_content'] += "Please input your sequence in FASTA format.\n"
-
-        seqinfo['isValidSeq'] = False
-    elif seqinfo['app_type'] == "SCAMPI-single" and numseq > MAX_ALLOWD_NUMSEQ_single:
-        seqinfo['errinfo_br'] += "Number of input sequences is %d while the maximum allowed is %d for %s!"%(numseq, MAX_ALLOWD_NUMSEQ_single, seqinfo['app_type'])
-        seqinfo['isValidSeq'] = False
-    elif seqinfo['app_type'] == "SCAMPI-msa" and numseq > MAX_ALLOWD_NUMSEQ_msa:
-        seqinfo['errinfo_br'] += "Number of input sequences is %d while the maximum allowed is %d for %s!"%(numseq, MAX_ALLOWD_NUMSEQ_msa, seqinfo['app_type'])
-        seqinfo['isValidSeq'] = False
-    else:
-        li_badseq_info = []
-        if 'isForceRun' in seqinfo and seqinfo['isForceRun'] and numseq > MAX_NUMSEQ_FOR_FORCE_RUN:
-            seqinfo['errinfo_br'] += "Invalid input!"
-            seqinfo['errinfo_content'] += "You have chosen the \"Force Run\" mode. "\
-                    "The maximum allowable number of sequences of a job is %d. "\
-                    "However, your input has %d sequences."%(MAX_NUMSEQ_FOR_FORCE_RUN, numseq)
-            seqinfo['isValidSeq'] = False
-        for i in xrange(numseq):
-            seq = seqRecordList[i][2].strip()
-            anno = seqRecordList[i][1].strip().replace('\t', ' ')
-            seqid = seqRecordList[i][0].strip()
-            seq = seq.upper()
-            seq = re.sub("[\s\n\r\t]", '', seq)
-            li1 = [m.start() for m in re.finditer("[^ABCDEFGHIKLMNPQRSTUVWYZX*-]", seq)]
-            if len(li1) > 0:
-                for j in xrange(len(li1)):
-                    msg = "Bad letter for amino acid in sequence %s (SeqNo. %d) "\
-                            "at position %d (letter: '%s')"%(seqid, i+1,
-                                    li1[j]+1, seq[li1[j]])
-                    li_badseq_info.append(msg)
-
-        if len(li_badseq_info) > 0:
-            seqinfo['errinfo_br'] += "There are bad letters for amino acids in your query!\n"
-            seqinfo['errinfo_content'] = "\n".join(li_badseq_info) + "\n"
-            seqinfo['isValidSeq'] = False
-
-# out of these 26 letters in the alphabet, 
-# B, Z -> X
-# U -> C
-# *, - will be deleted
-# 
-        li_newseq = []
-        for i in xrange(numseq):
-            seq = seqRecordList[i][2].strip()
-            anno = seqRecordList[i][1].strip()
-            seqid = seqRecordList[i][0].strip()
-            seq = seq.upper()
-            seq = re.sub("[\s\n\r\t]", '', seq)
-            anno = anno.replace('\t', ' ') #replace tab by whitespace
-
-
-            li1 = [m.start() for m in re.finditer("[BZ]", seq)]
-            if len(li1) > 0:
-                for j in xrange(len(li1)):
-                    msg = "Amino acid in sequence %s (SeqNo. %d) at position %d "\
-                            "(letter: '%s') has been replaced by 'X'"%(seqid,
-                                    i+1, li1[j]+1, seq[li1[j]])
-                    li_warn_info.append(msg)
-                seq = re.sub("[BZ]", "X", seq)
-
-            li1 = [m.start() for m in re.finditer("[U]", seq)]
-            if len(li1) > 0:
-                for j in xrange(len(li1)):
-                    msg = "Amino acid in sequence %s (SeqNo. %d) at position %d "\
-                            "(letter: '%s') has been replaced by 'C'"%(seqid,
-                                    i+1, li1[j]+1, seq[li1[j]])
-                    li_warn_info.append(msg)
-                seq = re.sub("[U]", "C", seq)
-
-            li1 = [m.start() for m in re.finditer("[*]", seq)]
-            if len(li1) > 0:
-                for j in xrange(len(li1)):
-                    msg = "Translational stop in sequence %s (SeqNo. %d) at position %d "\
-                            "(letter: '%s') has been deleted"%(seqid,
-                                    i+1, li1[j]+1, seq[li1[j]])
-                    li_warn_info.append(msg)
-                seq = re.sub("[*]", "", seq)
-
-            li1 = [m.start() for m in re.finditer("[-]", seq)]
-            if len(li1) > 0:
-                for j in xrange(len(li1)):
-                    msg = "Gap in sequence %s (SeqNo. %d) at position %d "\
-                            "(letter: '%s') has been deleted"%(seqid,
-                                    i+1, li1[j]+1, seq[li1[j]])
-                    li_warn_info.append(msg)
-                seq = re.sub("[-]", "", seq)
-
-            li_newseq.append(">%s\n%s"%(anno, seq))
-
-        filtered_seq = "\n".join(li_newseq) # seq content after validation
-        seqinfo['warninfo'] = "\n".join(li_warn_info) + "\n"
-
-    seqinfo['errinfo'] = seqinfo['errinfo_br'] + seqinfo['errinfo_content']
-    return filtered_seq
-#}}}
 def RunQuery(request, query):#{{{
     errmsg = []
     tmpdir = tempfile.mkdtemp(prefix="%s/static/tmp/tmp_"%(SITE_ROOT))
@@ -705,9 +469,9 @@ def RunQuery(request, query):#{{{
     seqfile_t = "%s/query.fa"%(tmpdir)
     seqfile_r = "%s/query.fa"%(rstdir)
     warnfile = "%s/warn.txt"%(tmpdir)
-    logfile = "%s/runjob.log"%(rstdir)
+    runjob_logfile = "%s/runjob.log"%(rstdir)
 
-    myfunc.WriteFile("tmpdir = %s\n"%(tmpdir), logfile, "a")
+    myfunc.WriteFile("tmpdir = %s\n"%(tmpdir), runjob_logfile, "a", True)
 
     jobinfo_str = "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n"%(query['date'], jobid,
             query['client_ip'], query['numseq'],
@@ -723,11 +487,11 @@ def RunQuery(request, query):#{{{
 
     # temporarily disable submission of SCAMPI-msa jobs until find a solution
     # that can be submitted to the computational node, 2017-08-10 
-    if ((query['app_type'] == "SCAMPI-single" and query['numseq'] <= MAX_ALLOWD_NUMSEQ_single)
+    if ((query['app_type'] == "SCAMPI-single" and query['numseq'] <= g_params['MAX_ALLOWD_NUMSEQ_single'])
              ):
         query['numseq_this_user'] = 1
         SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False)
-    elif ((query['app_type'] == "SCAMPI-msa" and query['numseq'] <= MAX_ALLOWD_NUMSEQ_msa)
+    elif ((query['app_type'] == "SCAMPI-msa" and query['numseq'] <= g_params['MAX_ALLOWD_NUMSEQ_msa'])
              ):
         query['numseq_this_user'] = 1
         SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=True)
@@ -804,9 +568,9 @@ def RunQuery_wsdl_local(rawseq, filtered_seq, seqinfo):#{{{
 def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
     scriptfile = "%s/app/submit_job_to_queue.py"%(SITE_ROOT)
     rstdir = "%s/%s"%(path_result, query['jobid'])
-    errfile = "%s/runjob.err"%(rstdir)
+    runjob_logfile = "%s/runjob.log"%(rstdir)
+    runjob_errfile = "%s/runjob.err"%(rstdir)
     debugfile = "%s/debug.log"%(rstdir) #this log only for debugging
-    logfile = "%s/runjob.log"%(rstdir)
     rmsg = ""
 
     cmd = [python_exec, scriptfile, "-nseq", "%d"%query['numseq'], "-nseq-this-user",
@@ -823,20 +587,13 @@ def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
         cmd += ["-force"]
     if isOnlyGetCache:
         cmd += ["-only-get-cache"]
-    cmdline = " ".join(cmd)
-    try:
-        rmsg = myfunc.check_output(cmd, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError, e:
-        failtagfile = "%s/%s"%(rstdir, "runjob.failed")
-        if not os.path.exists(failtagfile):
-            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            myfunc.WriteFile(date, failtagfile)
-        myfunc.WriteFile(str(e)+"\n", errfile, "a")
-        myfunc.WriteFile("cmdline: " + cmdline +"\n", debugfile, "a")
-        myfunc.WriteFile(rmsg+"\n", errfile, "a")
-        return 1
 
-    return 0
+    (isSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+    if not isSuccess:
+        webserver_common.WriteDateTimeTagFile(failedtagfile, runjob_logfile, runjob_errfile)
+        return 1
+    else:
+        return 0
 #}}}
 
 def thanks(request):#{{{
@@ -851,21 +608,19 @@ def get_queue(request):#{{{
     set_basic_config(request, info)
 
     status = "Queued"
-    if isSuperUser:
-        info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "Host", "QueueTime","RunTime", "Date", "Source"]
-    else:
-        info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "QueueTime","RunTime", "Date", "Source"]
+    info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email", "Method", 
+            "QueueTime","RunTime", "Date", "Source"]
+    if info['isSuperUser']:
+        info['header'].insert(6, "Host")
 
-    hdl = myfunc.ReadLineByBlock(divided_logfile_query)
+    hdl = myfunc.ReadLineByBlock(info['divided_logfile_query'])
     if hdl.failure:
         info['errmsg'] = ""
         pass
     else:
         finished_jobid_list = []
-        if os.path.exists(divided_logfile_finished_jobid):
-            finished_jobid_list = myfunc.ReadIDList2(divided_logfile_finished_jobid, 0, None)
+        if os.path.exists(info['divided_logfile_finished_jobid']):
+            finished_jobid_list = myfunc.ReadIDList2(info['divided_logfile_finished_jobid'], 0, None)
         finished_jobid_set = set(finished_jobid_list)
         jobRecordList = []
         lines = hdl.readlines()
@@ -876,7 +631,7 @@ def get_queue(request):#{{{
                 if len(strs) < 7:
                     continue
                 ip = strs[2]
-                if not isSuperUser and ip != client_ip:
+                if not info['isSuperUser'] and ip != info['client_ip']:
                     continue
                 jobid = strs[1]
                 if jobid in finished_jobid_set:
@@ -912,20 +667,21 @@ def get_queue(request):#{{{
             jobinfofile = "%s/jobinfo"%(rstdir)
             jobinfo = myfunc.ReadFile(jobinfofile).strip()
             jobinfolist = jobinfo.split("\t")
-            if len(jobinfolist) >= 8:
+            if len(jobinfolist) >= 9:
                 submit_date_str = jobinfolist[0]
                 ip = jobinfolist[2]
                 numseq = int(jobinfolist[3])
                 jobname = jobinfolist[5]
                 email = jobinfolist[6]
                 method_submission = jobinfolist[7]
+                app_type = jobinfolist[8]
 
             starttagfile = "%s/runjob.start"%(rstdir)
             queuetime = ""
             runtime = ""
             isValidSubmitDate = True
             try:
-                submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
@@ -934,19 +690,17 @@ def get_queue(request):#{{{
 
             if isSuperUser:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, email, ip, queuetime, runtime,
+                    numseq, email, app_type, ip, queuetime, runtime,
                     submit_date_str, method_submission])
             else:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, email, queuetime, runtime,
+                    numseq, email, app_type, queuetime, runtime,
                     submit_date_str, method_submission])
 
 
-        info['BASEURL'] = BASEURL
         info['content'] = jobid_inqueue_list
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/queue.html', info)
 #}}}
 def get_running(request):#{{{
@@ -956,8 +710,12 @@ def get_running(request):#{{{
     info = {}
 
     set_basic_config(request, info)
+    info['header'] = ["No.", "JobID","JobName", "NumSeq","NumFinish", "Email", "Method", 
+            "QueueTime","RunTime", "Date", "Source"]
+    if info['isSuperUser']:
+        info['header'].insert(7, "Host")
 
-    hdl = myfunc.ReadLineByBlock(divided_logfile_query)
+    hdl = myfunc.ReadLineByBlock(info['divided_logfile_query'])
     if hdl.failure:
         info['errmsg'] = ""
         pass
@@ -968,7 +726,7 @@ def get_running(request):#{{{
         finished_jobid_set = set(finished_jobid_list)
         jobRecordList = []
         lines = hdl.readlines()
-        current_time = datetime.now()
+        current_time = datetime.now(timezone(TZ))
         while lines != None:
             for line in lines:
                 strs = line.split("\t")
@@ -1015,13 +773,14 @@ def get_running(request):#{{{
             if os.path.exists(finished_idx_file):
                 finished_idxlist = myfunc.ReadIDList(finished_idx_file)
                 numFinishedSeq = len(set(finished_idxlist))
-            if len(jobinfolist) >= 8:
+            if len(jobinfolist) >= 9:
                 submit_date_str = jobinfolist[0]
                 ip = jobinfolist[2]
                 numseq = int(jobinfolist[3])
                 jobname = jobinfolist[5]
                 email = jobinfolist[6]
                 method_submission = jobinfolist[7]
+                app_type = jobinfolist[8]
 
 
             starttagfile = "%s/runjob.start"%(rstdir)
@@ -1030,12 +789,12 @@ def get_running(request):#{{{
             isValidSubmitDate = True
             isValidStartDate = True
             try:
-                submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                start_date = webserver_common.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             if isValidStartDate:
@@ -1043,44 +802,31 @@ def get_running(request):#{{{
             if isValidStartDate and isValidSubmitDate:
                 queuetime = myfunc.date_diff(submit_date, start_date)
 
-            if isSuperUser:
+            if info['isSuperUser']:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, numFinishedSeq, email, ip, queuetime, runtime,
+                    numseq, numFinishedSeq, email, app_type, ip, queuetime, runtime,
                     submit_date_str, method_submission])
             else:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
-                    numseq, numFinishedSeq, email, queuetime, runtime,
+                    numseq, numFinishedSeq, email, app_type, queuetime, runtime,
                     submit_date_str, method_submission])
 
 
-        info['BASEURL'] = BASEURL
-        if info['isSuperUser']:
-            info['header'] = ["No.", "JobID","JobName", "NumSeq","NumFinish",
-                    "Email", "Host", "QueueTime","RunTime", "Date", "Source"]
-        else:
-            info['header'] = ["No.", "JobID","JobName", "NumSeq","NumFinish",
-                    "Email", "QueueTime","RunTime", "Date", "Source"]
         info['content'] = jobid_inqueue_list
 
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/running.html', info)
 #}}}
 def get_finished_job(request):#{{{
     info = {}
     set_basic_config(request, info)
+    info['header'] = ["No.", "JobID","JobName", "NumSeq",
+            "Email", "Method", "QueueTime","RunTime", "Date", "Source"]
 
-    if isSuperUser:
-        maxdaystoshow = BIG_NUMBER
-        info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "Method", "Host", "QueueTime","RunTime", "Date", "Source"]
-    else:
-        maxdaystoshow = MAX_DAYS_TO_SHOW
-        info['header'] = ["No.", "JobID","JobName", "NumSeq",
-                "Email", "Method", "QueueTime","RunTime", "Date", "Source"]
+    if info['isSuperUser']:
+        info['header'].insert(6, "Host")
 
-    info['MAX_DAYS_TO_SHOW'] = maxdaystoshow
-
-    hdl = myfunc.ReadLineByBlock(divided_logfile_query)
+    hdl = myfunc.ReadLineByBlock(info['divided_logfile_query'])
     if hdl.failure:
         #info['errmsg'] = "Failed to retrieve finished job information!"
         info['errmsg'] = ""
@@ -1089,7 +835,7 @@ def get_finished_job(request):#{{{
         finished_job_dict = myfunc.ReadFinishedJobLog(info['divided_logfile_finished_jobid'])
         jobRecordList = []
         lines = hdl.readlines()
-        current_time = datetime.now()
+        current_time = datetime.now(timezone(TZ))
         while lines != None:
             for line in lines:
                 strs = line.split("\t")
@@ -1102,15 +848,14 @@ def get_finished_job(request):#{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = datetime.strptime(submit_date_str,
-                            "%Y-%m-%d %H:%M:%S")
+                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
                 if not isValidSubmitDate:
                     continue
 
                 diff_date = current_time - submit_date
-                if diff_date.days > maxdaystoshow:
+                if diff_date.days > info['MAX_DAYS_TO_SHOW']:
                     continue
                 jobid = strs[1]
                 rstdir = "%s/%s"%(path_result, jobid)
@@ -1161,6 +906,7 @@ def get_finished_job(request):#{{{
                 jobinfolist = jobinfo.split("\t")
                 if len(jobinfolist) >= 9:
                     submit_date_str = jobinfolist[0]
+                    ip = jobinfolist[2]
                     numseq = int(jobinfolist[3])
                     jobname = jobinfolist[5]
                     email = jobinfolist[6]
@@ -1171,17 +917,17 @@ def get_finished_job(request):#{{{
             isValidStartDate = True
             isValidFinishDate = True
             try:
-                submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                start_date =  webserver_common.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = datetime.strptime(finish_date_str, "%Y-%m-%d %H:%M:%S")
+                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
 
@@ -1204,24 +950,18 @@ def get_finished_job(request):#{{{
 
         info['content'] = finished_job_info_list
 
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/finished_job.html', info)
 #}}}
 def get_failed_job(request):#{{{
     info = {}
 
     set_basic_config(request, info)
+    info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email", "Method",
+            "QueueTime","RunTime", "Date", "Source"]
 
     if info['isSuperUser']:
-        maxdaystoshow = BIG_NUMBER
-        info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email",
-                "Host", "QueueTime","RunTime", "Date", "Source"]
-    else:
-        maxdaystoshow = MAX_DAYS_TO_SHOW
-        info['header'] = ["No.", "JobID","JobName", "NumSeq", "Email",
-                "QueueTime","RunTime", "Date", "Source"]
-
-    info['MAX_DAYS_TO_SHOW'] = maxdaystoshow
+        info['header'].insert(6, "Host")
 
     hdl = myfunc.ReadLineByBlock(info['divided_logfile_query'])
     if hdl.failure:
@@ -1232,7 +972,7 @@ def get_failed_job(request):#{{{
         finished_job_dict = myfunc.ReadFinishedJobLog(info['divided_logfile_finished_jobid'])
         jobRecordList = []
         lines = hdl.readlines()
-        current_time = datetime.now()
+        current_time = datetime.now(timezone(TZ))
         while lines != None:
             for line in lines:
                 strs = line.split("\t")
@@ -1243,9 +983,9 @@ def get_failed_job(request):#{{{
                     continue
 
                 submit_date_str = strs[0]
-                submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
                 diff_date = current_time - submit_date
-                if diff_date.days > maxdaystoshow:
+                if diff_date.days > info['MAX_DAYS_TO_SHOW']:
                     continue
                 jobid = strs[1]
                 rstdir = "%s/%s"%(path_result, jobid)
@@ -1288,16 +1028,19 @@ def get_failed_job(request):#{{{
                 submit_date_str = finished_job_dict[jobid][6]
                 start_date_str = finished_job_dict[jobid][ 7]
                 finish_date_str = finished_job_dict[jobid][8]
+                app_type = finished_job_dict[jobid][9]
             else:
                 jobinfofile = "%s/jobinfo"%(rstdir)
                 jobinfo = myfunc.ReadFile(jobinfofile).strip()
                 jobinfolist = jobinfo.split("\t")
                 if len(jobinfolist) >= 8:
                     submit_date_str = jobinfolist[0]
+                    ip = jobinfolist[2]
                     numseq = int(jobinfolist[3])
                     jobname = jobinfolist[5]
                     email = jobinfolist[6]
                     method_submission = jobinfolist[7]
+                    app_type = jobinfolist[8]
 
 
             isValidStartDate = True
@@ -1305,18 +1048,18 @@ def get_failed_job(request):#{{{
             isValidSubmitDate = True
 
             try:
-                submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                start_date =  webserver_common.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             failed_date_str = myfunc.ReadFile(failtagfile).strip()
             try:
-                failed_date = datetime.strptime(failed_date_str, "%Y-%m-%d %H:%M:%S")
+                failed_date = webserver_common.datetime_str_to_time(failed_date_str)
             except ValueError:
                 isValidFailedDate = False
 
@@ -1330,68 +1073,29 @@ def get_failed_job(request):#{{{
 
             if info['isSuperUser']:
                 failed_job_info_list.append([rank, jobid, jobname[:20],
-                    str(numseq), email, ip, queuetime, runtime, submit_date_str,
+                    str(numseq), email, app_type, ip, queuetime, runtime, submit_date_str,
                     method_submission])
             else:
                 failed_job_info_list.append([rank, jobid, jobname[:20],
-                    str(numseq), email, queuetime, runtime, submit_date_str,
+                    str(numseq), email, app_type, queuetime, runtime, submit_date_str,
                     method_submission])
 
 
         info['content'] = failed_job_info_list
 
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/failed_job.html', info)
 #}}}
 
 def get_help(request):#{{{
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
-
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
-
+    set_basic_config(request, info)
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/help.html', info)
 #}}}
 def get_news(request):#{{{
     info = {}
-
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    info['username'] = username
-    info['isSuperUser'] = isSuperUser
-    info['client_ip'] = client_ip
+    set_basic_config(request, info)
 
     newsfile = "%s/%s/%s"%(SITE_ROOT, "static/doc", "news.txt")
     newsList = []
@@ -1400,18 +1104,15 @@ def get_news(request):#{{{
     info['newsList'] = newsList
     info['newsfile'] = newsfile
 
-    info['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
-
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/news.html', info)
 #}}}
 def get_reference(request):#{{{
     info = {}
     set_basic_config(request, info)
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/reference.html', info)
 #}}}
-
 
 def get_serverstatus(request):#{{{
     info = {}
@@ -1443,7 +1144,7 @@ def get_serverstatus(request):#{{{
                 cntjob += 1
         num_seq_in_local_queue = cntjob
     except subprocess.CalledProcessError, e:
-        datetime = time.strftime("%Y-%m-%d %H:%M:%S")
+        datetime = time.strftime(FORMAT_DATETIME)
         myfunc.WriteFile("[%s] %s\n"%(datetime, str(e)), gen_errfile, "a")
 
 # get number of finished seqs
@@ -1491,17 +1192,14 @@ def get_serverstatus(request):#{{{
     info['total_num_finished_seq_single'] = total_num_finished_seq_single
     info['num_finished_seqs_str'] = str(total_num_finished_seq)
     info['startdate'] = startdate
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
 
     return render(request, 'pred/serverstatus.html', info)
 #}}}
 def get_example(request):#{{{
     info = {}
-
     set_basic_config(request, info)
-
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'], info['divided_logfile_query'], info['divided_logfile_finished_jobid'])
-
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/example.html', info)
 #}}}
 def oldtopcons(request):#{{{
@@ -1533,9 +1231,7 @@ def help_wsdl_api(request):#{{{
         api_script_info_list.append([api_script_lang_list[i], api_script_basename, usage])
 
     info['api_script_info_list'] = api_script_info_list
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'],
-            info['divided_logfile_query'],
-            info['divided_logfile_finished_jobid'])
+    info['jobcounter'] = GetJobCounter(info)
 
     return render(request, 'pred/help_wsdl_api.html', info)
 #}}}
@@ -1553,35 +1249,14 @@ def download(request):#{{{
         size_wholepackage_str = myfunc.Size_byte2human(size_wholepackage)
         info['size_wholepackage'] = size_wholepackage_str
 
-    info['jobcounter'] = GetJobCounter(info['client_ip'], info['isSuperUser'],
-            info['divided_logfile_query'],
-            info['divided_logfile_finished_jobid'])
-
+    info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/download.html', info)
 #}}}
 
 def get_results(request, jobid="1"):#{{{
     resultdict = {}
 
-    username = request.user.username
-    client_ip = request.META['REMOTE_ADDR']
-    if username in settings.SUPER_USER_LIST:
-        isSuperUser = True
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "submitted_seq.log")
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log", "finished_job.log")
-    else:
-        isSuperUser = False
-        divided_logfile_query =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_submitted_seq.log"%(client_ip))
-        divided_logfile_finished_jobid =  "%s/%s/%s"%(SITE_ROOT,
-                "static/log/divided", "%s_finished_job.log"%(client_ip))
-
-    resultdict['username'] = username
-    resultdict['isSuperUser'] = isSuperUser
-    resultdict['client_ip'] = client_ip
-
+    set_basic_config(request, resultdict)
 
     #img1 = "%s/%s/%s/%s"%(SITE_ROOT, "result", jobid, "PconsC2.s400.jpg")
     #url_img1 =  serve(request, os.path.basename(img1), os.path.dirname(img1))
@@ -1593,7 +1268,7 @@ def get_results(request, jobid="1"):#{{{
     starttagfile = "%s/%s"%(rstdir, "runjob.start")
     finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
     failtagfile = "%s/%s"%(rstdir, "runjob.failed")
-    errfile = "%s/%s"%(rstdir, "runjob.err")
+    runjob_errfile = "%s/%s"%(rstdir, "runjob.err")
     query_seqfile = "%s/%s"%(rstdir, "query.fa")
     raw_query_seqfile = "%s/%s"%(rstdir, "query.raw.fa")
     seqid_index_mapfile = "%s/%s/%s"%(rstdir,jobid, "seqid_index_map.txt")
@@ -1626,13 +1301,13 @@ def get_results(request, jobid="1"):#{{{
 
     isValidSubmitDate = True
     try:
-        submit_date = datetime.strptime(submit_date_str, "%Y-%m-%d %H:%M:%S")
+        submit_date = webserver_common.datetime_str_to_time(submit_date_str)
     except ValueError:
         isValidSubmitDate = False
-    current_time = datetime.now()
+    current_time = datetime.now(timezone(TZ))
 
     resultdict['isResultFolderExist'] = True
-    resultdict['errinfo'] = myfunc.ReadFile(errfile)
+    resultdict['errinfo'] = myfunc.ReadFile(runjob_errfile)
 
     status = ""
     queuetime = ""
@@ -1651,12 +1326,12 @@ def get_results(request, jobid="1"):#{{{
         isValidStartDate = True
         isValidFailedDate = True
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+            start_date = webserver_common.datetime_str_to_time(start_date_str)
         except ValueError:
             isValidStartDate = False
         failed_date_str = myfunc.ReadFile(failtagfile).strip()
         try:
-            failed_date = datetime.strptime(failed_date_str, "%Y-%m-%d %H:%M:%S")
+            failed_date = webserver_common.datetime_str_to_time(failed_date_str)
         except ValueError:
             isValidFailedDate = False
         if isValidSubmitDate and isValidStartDate:
@@ -1673,12 +1348,12 @@ def get_results(request, jobid="1"):#{{{
             isValidFinishDate = True
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                start_date = webserver_common.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = datetime.strptime(finish_date_str, "%Y-%m-%d %H:%M:%S")
+                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
             if isValidSubmitDate and isValidStartDate:
@@ -1691,7 +1366,7 @@ def get_results(request, jobid="1"):#{{{
                 isValidStartDate = True
                 start_date_str = myfunc.ReadFile(starttagfile).strip()
                 try:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                    start_date = webserver_common.datetime_str_to_time(start_date_str)
                 except ValueError:
                     isValidStartDate = False
                 resultdict['isStarted'] = True
@@ -1725,7 +1400,6 @@ def get_results(request, jobid="1"):#{{{
     resultdict['submit_date'] = submit_date_str
     resultdict['queuetime'] = queuetime
     resultdict['runtime'] = runtime
-    resultdict['BASEURL'] = BASEURL
     resultdict['status'] = status
     resultdict['color_status'] = color_status
     resultdict['numseq'] = numseq
@@ -1807,7 +1481,7 @@ def get_results(request, jobid="1"):#{{{
         start_date_str = myfunc.ReadFile(starttagfile).strip()
         isValidStartDate = False
         try:
-            start_date_epoch = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S").strftime('%s')
+            start_date_epoch = webserver_common.datetime_str_to_epoch(start_date_str)
             isValidStartDate = True
         except:
             pass
@@ -1900,21 +1574,7 @@ def get_results(request, jobid="1"):#{{{
     resultdict['num_finished'] = num_finished
     resultdict['percent_finished'] = "%.1f"%(float(num_finished)/numseq*100)
 
-    resultdict['jobcounter'] = GetJobCounter(client_ip, isSuperUser,
-            divided_logfile_query, divided_logfile_finished_jobid)
+    resultdict['jobcounter'] = GetJobCounter(resultdict)
     return render(request, 'pred/get_results.html', resultdict)
-#}}}
-
-
-def my_view(request):#{{{
-    # loop through keys
-    for key in request.POST:
-        value = request.POST[key]
-    # loop through keys and values
-    for key, value in request.POST.iteritems():
-        print key, value
-#}}}
-def search_form(request):#{{{
-    return render(request, 'pred/search_form.html')
 #}}}
 
