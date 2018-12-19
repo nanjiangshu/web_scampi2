@@ -280,6 +280,12 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             isSuccess = False
             webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
+        finish_status = "" #["success", "failed", "partly_failed"]
+        if isSuccess:
+            finish_status = "success"
+        else:
+            finish_status = "failed"
+
 # send the result to email
 # do not sendmail at the cloud VM
         if webserver_common.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
@@ -358,8 +364,10 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     isSuccess = False
     if (os.path.exists(finishtagfile) and os.path.exists(outfile)):
         isSuccess = True
+        finish_status = "success"
     else:
         isSuccess = False
+        finish_status = "failed"
         webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
