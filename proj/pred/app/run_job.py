@@ -8,11 +8,8 @@
 # md5_key = hashlib.md5(string).hexdigest()
 # subfolder = md5_key[:2]
 
-# 
-
 import os
 import sys
-import subprocess
 import time
 import myfunc
 import webserver_common
@@ -230,11 +227,11 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             numCPU = 4
             outtopfile = "%s/query.top"%(tmp_outpath_this_seq)
             cmd = [runscript_msa, seqfile_this_seq, outtopfile, blastdir, blastdb]
-            (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+            (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
             if os.path.exists(tmp_outpath_this_seq):
                 cmd = ["mv","-f", tmp_outpath_this_seq, outpath_this_seq]
-                (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+                (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
                 if isCmdSuccess:
                     runtime = runtime_in_sec #in seconds
@@ -285,8 +282,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 # send the result to email
 # do not sendmail at the cloud VM
-        if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
-            webserver_common.SendEmail_on_finish(jobid, base_www_url,
+        if webserver_common.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
+            webserver_common.SendEmail_on_finish(jobid, g_params['base_www_url'],
                     finish_status, name_server="SCAMPI2-msa", from_email="SCAMPI@scampi.bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
@@ -341,7 +338,7 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         webserver_common.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
 
         cmd = [runscript_single, infile,  tmp_outfile]
-        (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+        (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
         if os.path.exists(tmp_outfile):
             cmd = ["mv","-f", tmp_outfile, outfile]
@@ -367,8 +364,8 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 # send the result to email
 # do not sendmail at the cloud VM
-    if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
-        webserver_common.SendEmail_on_finish(jobid, base_www_url,
+    if webserver_common.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
+        webserver_common.SendEmail_on_finish(jobid, g_params['base_www_url'],
                 finish_status, name_server="SCAMPI2-single", from_email="SCAMPI@scampi.bioinfo.se",
                 to_email=email, contact_email=contact_email,
                 logfile=runjob_logfile, errfile=runjob_errfile)
@@ -440,8 +437,8 @@ def main(g_params):#{{{
         return 1
     elif not os.path.exists(outpath):
         try:
-            subprocess.check_output(["mkdir", "-p", outpath])
-        except subprocess.CalledProcessError, e:
+            os.makedirs(outpath)
+        except Exception as e:
             print >> sys.stderr, e
             return 1
     if tmpdir == "":
@@ -449,8 +446,8 @@ def main(g_params):#{{{
         return 1
     elif not os.path.exists(tmpdir):
         try:
-            subprocess.check_output(["mkdir", "-p", tmpdir])
-        except subprocess.CalledProcessError, e:
+            os.makedirs(tmpdir)
+        except Exception as e:
             print >> sys.stderr, e
             return 1
 

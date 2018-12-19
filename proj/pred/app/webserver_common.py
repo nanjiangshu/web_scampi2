@@ -183,10 +183,10 @@ def RunCmd(cmd, logfile, errfile, verbose=False):# {{{
     date_str = time.strftime(FORMAT_DATETIME)
     rmsg = ""
     try:
-        rmsg = subprocess.check_output(cmd)
         if verbose:
             msg = "workflow: %s"%(cmdline)
             myfunc.WriteFile("[%s] %s\n"%(date_str, msg),  logfile, "a", True)
+        rmsg = subprocess.check_output(cmd)
         isCmdSuccess = True
     except subprocess.CalledProcessError, e:
         msg = "cmdline: %s\nFailed with message \"%s\""%(cmdline, str(e))
