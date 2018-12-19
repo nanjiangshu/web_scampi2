@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Description: run job
 
 # Derived from topcons2_workflow_run_job.py on 2015-05-27

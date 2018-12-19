@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Description: daemon to submit jobs and retrieve results to/from remote
 #              servers
 # 
