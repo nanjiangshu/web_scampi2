@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Description:
 #   A collection of classes and functions used by other programs

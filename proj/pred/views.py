@@ -624,7 +624,7 @@ def get_queue(request):#{{{
         finished_jobid_set = set(finished_jobid_list)
         jobRecordList = []
         lines = hdl.readlines()
-        current_time = datetime.now()
+        current_time = datetime.now(timezone(TZ))
         while lines != None:
             for line in lines:
                 strs = line.split("\t")
@@ -688,7 +688,7 @@ def get_queue(request):#{{{
             if isValidSubmitDate:
                 queuetime = myfunc.date_diff(submit_date, current_time)
 
-            if isSuperUser:
+            if info['isSuperUser']:
                 jobid_inqueue_list.append([rank, jobid, jobname[:20],
                     numseq, email, app_type, ip, queuetime, runtime,
                     submit_date_str, method_submission])
@@ -1513,9 +1513,9 @@ def get_results(request, jobid="1"):#{{{
                 resultdict['refresh_interval'] = 5.0
     else:
         #resultdict['refresh_interval'] = numseq * 2
-        addtime = int(math.sqrt(max(0,min(num_remain, num_finished))))
+        addtime = int(math.sqrt(max(0,min(num_remain, num_finished))))+1
         if app_type == "SCAMPI-single":
-            resultdict['refresh_interval'] = numseq * average_run_time_single
+            resultdict['refresh_interval'] = max(1, num_remain * average_run_time_single)
         else:
             if not os.path.exists(qdinittagfile):
                 resultdict['refresh_interval'] = 2
