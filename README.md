@@ -2,11 +2,19 @@
 
 ## Description:
     This is the web-server implementation of the SCAMPI2 workflow.
+    [github](https://github.com/christoph-peters/scampi2)
 
-    The web-server is developed with Django (>=1.6.4)
+    The web-server is developed with Django v1.11.15
 
     This software is open source and licensed under the GPL v3 license (a copy
     of the license is included in the repository)
+
+## Reference
+
+Improved topology predictions using the first and last hydrophobic helix rule.
+Christoph Peters, Konstantinos D. Tsirigos, Nanjiang Shu, Arne Elofsson.
+Bioinformatics. 2015 Dec 7. pii: btv709.
+[PubMed](https://www.ncbi.nlm.nih.gov/pubmed/26644416)
 
 
 ## Author
@@ -16,7 +24,6 @@ System developer at NBIS
 
 Email: nanjiang.shu@scilifelab.se
 
-## Reference
 
 ## Installation
 
