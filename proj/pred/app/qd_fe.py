@@ -283,7 +283,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                 isValidSubmitDate = False
 
             if isValidSubmitDate:
-                current_time = datetime.datetime.now()
+                current_time = datetime.now(timezone(TZ))
                 timeDiff = current_time - submit_date
                 queuetime_in_sec = timeDiff.seconds
             else:
