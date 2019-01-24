@@ -36,7 +36,7 @@ import numpy
 from geoip import geolite2
 import pycountry
 
-TZ = "Europe/Stockholm"
+TZ = webcom.TZ
 os.environ['TZ'] = TZ
 time.tzset()
 
@@ -1890,7 +1890,7 @@ def InitGlobalParameter():#{{{
     g_params['MAX_TIME_IN_REMOTE_QUEUE'] = 3600*24 # one day in seconds
     g_params['MAX_KEEP_DAYS'] = 60
     g_params['MAX_RESUBMIT'] = 2
-    g_params['FORMAT_DATETIME'] = "%Y-%m-%d %H:%M:%S %Z"
+    g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
     return g_params
 #}}}
 if __name__ == '__main__' :
