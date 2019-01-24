@@ -233,8 +233,6 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             start_date_str = ""
             finish_date_str = ""
             rstdir = "%s/%s"%(path_result, jobid)
-            if not os.path.exists(rstdir):
-                continue
 
             numseq = 1
             try:
