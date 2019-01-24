@@ -307,6 +307,15 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
         lines = hdl.readlines()
     hdl.close()
 
+# re-write logs of submitted jobs
+    li_str = []
+    for li in new_submitted_list:
+        li_str.append(li[1])
+    if len(li_str)>0:
+        myfunc.WriteFile("\n".join(li_str)+"\n", submitjoblogfile, "w", True)
+    else:
+        myfunc.WriteFile("", submitjoblogfile, "w", True)
+
 # re-write logs of finished jobs
     li_str = []
     for li in new_finished_list:
