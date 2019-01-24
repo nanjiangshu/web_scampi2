@@ -19,7 +19,7 @@ sys.path.append("%s/env/lib/python2.7/site-packages/"%(webserver_root))
 sys.path.append("/usr/local/lib/python2.7/dist-packages")
 
 import myfunc
-import webserver_common
+import webserver_common as webcom
 import time
 from datetime import datetime
 from dateutil import parser as dtparser
@@ -213,6 +213,8 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
         finished_job_dict = myfunc.ReadFinishedJobLog(finishedjoblogfile)
 
     new_finished_list = []  # Finished or Failed
+    new_submitted_list = []  # 
+
     new_runjob_list = []    # Running
     new_waitjob_list = []    # Queued
     lines = hdl.readlines()
@@ -240,8 +242,16 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             except:
                 pass
 
+            isRstFolderExist = False
+            if os.path.exists(rstdir):
+                isRstFolderExist = True
+
+
+            if isRstFolderExist:
+                new_submitted_list.append([jobid,line])
+
             if jobid in finished_job_dict:
-                if os.path.exists(rstdir):
+                if isRstFolderExist:
                     li = [jobid] + finished_job_dict[jobid]
                     new_finished_list.append(li)
                 continue
@@ -278,7 +288,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             UPPER_WAIT_TIME_IN_SEC = 60
             isValidSubmitDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
@@ -334,6 +344,17 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             li_str.append("\t".join(li))
     if len(li_str)>0:
         myfunc.WriteFile("\n".join(li_str)+"\n", allfinishedjoblogfile, "a", True)
+
+# update all_submitted jobs
+    allsubmitjoblogfile = "%s/all_submitted_seq.log"%(path_log)
+    allsubmitted_jobid_set = set(myfunc.ReadIDList2(allsubmitjoblogfile, col=1, delim="\t"))
+    li_str = []
+    for li in new_submitted_list:
+        jobid = li[0]
+        if not jobid in allsubmitted_jobid_set:
+            li_str.append(li[1])
+    if len(li_str)>0:
+        myfunc.WriteFile("\n".join(li_str)+"\n", allsubmitjoblogfile, "a", True)
 
 # write logs of running and queuing jobs
 # the queuing jobs are sorted in descending order by the suq priority
@@ -872,7 +893,7 @@ def GetResult(jobid):#{{{
                             pass
                     if os.path.exists(outfile_zip) and isRetrieveSuccess:
                         cmd = ["unzip", outfile_zip, "-d", tmpdir]
-                        webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+                        webcom.RunCmd(cmd, gen_logfile, gen_errfile)
                         rst_this_seq = "%s/%s/seq_0"%(tmpdir, remote_jobid)
 
                         if os.path.islink(outpath_this_seq):
@@ -882,7 +903,7 @@ def GetResult(jobid):#{{{
 
                         if os.path.exists(rst_this_seq) and not os.path.exists(outpath_this_seq):
                             cmd = ["mv","-f", rst_this_seq, outpath_this_seq]
-                            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+                            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
                             if os.path.exists(outpath_this_seq):
                                 isSuccess = True
 
@@ -1087,10 +1108,10 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
             maplist.append("%s\t%d\t%s\t%s"%("seq_%d"%i, len(seqList[i]),
                 seqAnnoList[i], seqList[i]))
         start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST").strip()
-        start_date_epoch = webserver_common.datetime_str_to_epoch(start_date_str)
+        start_date_epoch = webcom.datetime_str_to_epoch(start_date_str)
         all_runtime_in_sec = float(date_str_epoch) - float(start_date_epoch)
 
-        webserver_common.WriteSCAMPI2MSATextResultFile(resultfile_text, outpath_result, maplist,
+        webcom.WriteSCAMPI2MSATextResultFile(resultfile_text, outpath_result, maplist,
                 all_runtime_in_sec, base_www_url, statfile=statfile)
 
         # now making zip instead (for windows users)
@@ -1099,7 +1120,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         zipfile_fullpath = "%s/%s"%(rstdir, zipfile)
         os.chdir(rstdir)
         cmd = ["zip", "-rq", zipfile, jobid]
-        webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+        webcom.RunCmd(cmd, runjob_logfile, runjob_errfile)
 
         date_str = time.strftime(g_params['FORMAT_DATETIME'])
         if len(failed_idx_list)>0:
@@ -1112,12 +1133,12 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
 
 
         # send the result to email
-        if webserver_common.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
-            webserver_common.SendEmail_on_finish(jobid, base_www_url,
+        if webcom.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
+            webcom.SendEmail_on_finish(jobid, base_www_url,
                     finish_status, name_server="SCAMPI2", from_email="SCAMPI@scampi.bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
-        webserver_common.CleanJobFolder_Scampi(rstdir)
+        webcom.CleanJobFolder_Scampi(rstdir)
 
 #}}}
 def RunStatistics(path_result, path_log):#{{{
@@ -1247,15 +1268,15 @@ def RunStatistics(path_result, path_log):#{{{
             isValidStartDate = True
             isValidFinishDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             try:
-                start_date =  webserver_common.datetime_str_to_time(start_date_str)
+                start_date =  webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             try:
-                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
+                finish_date = webcom.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
 
@@ -1312,12 +1333,12 @@ def RunStatistics(path_result, path_log):#{{{
             fpout.close()
             #plot
             cmd = ["%s/app/plot_numseq_of_job.sh"%(basedir), outfile]
-            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
         except IOError:
             continue
     cmd = ["%s/app/plot_numseq_of_job_mtp.sh"%(basedir), "-web",
             outfile_numseqjob_web, "-wsdl", outfile_numseqjob_wsdl]
-    webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+    webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
 
 # output waittime vs numseq_of_job
@@ -1404,13 +1425,13 @@ def RunStatistics(path_result, path_log):#{{{
         outfile = flist[i]
         if os.path.exists(outfile):
             cmd = ["%s/app/plot_nseq_waitfinishtime.sh"%(basedir), outfile]
-            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
     flist = flist2+flist3
     for i in xrange(len(flist)):
         outfile = flist[i]
         if os.path.exists(outfile):
             cmd = ["%s/app/plot_avg_waitfinishtime.sh"%(basedir), outfile]
-            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
 # get longest predicted seq
 # get query with most TM helics
@@ -1574,19 +1595,19 @@ def RunStatistics(path_result, path_log):#{{{
         pass
     if os.path.exists(outfile_avg_runtime):
         cmd = ["%s/app/plot_avg_runtime.sh"%(basedir), outfile_avg_runtime]
-        webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+        webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
     flist = [outfile_runtime, outfile_runtime_pfam, outfile_runtime_cdd,
             outfile_runtime_uniref]
     for outfile in flist:
         if os.path.exists(outfile):
             cmd = ["%s/app/plot_length_runtime.sh"%(basedir), outfile]
-            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
     cmd = ["%s/app/plot_length_runtime_mtp.sh"%(basedir), "-pfam",
             outfile_runtime_pfam, "-cdd", outfile_runtime_cdd, "-uniref",
             outfile_runtime_uniref, "-sep-avg"]
-    webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+    webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
 #5. output num-submission time series with different bins (day, week, month, year)
     hdl = myfunc.ReadLineByBlock(submitjoblogfile)
@@ -1610,7 +1631,7 @@ def RunStatistics(path_result, path_log):#{{{
                 method_submission = strs[7]
                 isValidSubmitDate = True
                 try:
-                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                    submit_date = webcom.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
                 if isValidSubmitDate:#{{{
@@ -1722,7 +1743,7 @@ def RunStatistics(path_result, path_log):#{{{
         #plot
         if os.path.exists(outfile):
             cmd = ["%s/app/plot_numsubmit.sh"%(basedir), outfile]
-            webserver_common.RunCmd(cmd, gen_logfile, gen_errfile)
+            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
 #}}}
 
@@ -1787,7 +1808,8 @@ def main(g_params):#{{{
 
         if loop % 500 == 10:
             RunStatistics(path_result, path_log)
-            webserver_common.DeleteOldResult(path_result, path_log, gen_logfile, MAX_KEEP_DAYS=g_params['MAX_KEEP_DAYS'])
+            webcom.DeleteOldResult(path_result, path_log, gen_logfile, MAX_KEEP_DAYS=g_params['MAX_KEEP_DAYS'])
+            webcom.CleanServerFile(gen_logfile, gen_errfile)
 
         for f in [gen_logfile, gen_errfile,
                 "%s/restart_qd_fe.cgi.log"%(path_log),

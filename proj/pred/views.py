@@ -820,9 +820,9 @@ def get_running(request):#{{{
 def get_finished_job(request):#{{{
     info = {}
     set_basic_config(request, info)
+
     info['header'] = ["No.", "JobID","JobName", "NumSeq",
             "Email", "Method", "QueueTime","RunTime", "Date", "Source"]
-
     if info['isSuperUser']:
         info['header'].insert(6, "Host")
 

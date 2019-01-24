@@ -10,6 +10,8 @@
 
 import os
 import sys
+rundir = os.path.dirname(os.path.realpath(__file__))
+webserver_rootdir = os.path.realpath("%s/../../../"%(rundir))
 import myfunc
 import re
 import tabulate
@@ -22,6 +24,8 @@ import shutil
 import subprocess
 TZ = "Europe/Stockholm"
 FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
+
+python_exec = os.path.realpath("%s/env/bin/python"%(webserver_rootdir))
 
 def WriteSubconsTextResultFile(outfile, outpath_result, maplist,#{{{
         runtime_in_sec, base_www_url, statfile=""):
@@ -573,4 +577,22 @@ sequences
         return avg_newrun_time
 
 
+#}}}
+def CleanServerFile(logfile, errfile):#{{{
+    """Clean old files on the server"""
+# clean tmp files
+    msg = "CleanServerFile..."
+    date_str = time.strftime(FORMAT_DATETIME)
+    myfunc.WriteFile("[%s] %s\n"%(date_str, msg), logfile, "a", True)
+    cmd = ["bash", "%s/clean_server_file.sh"%(rundir)]
+    RunCmd(cmd, logfile, errfile)
+#}}}
+def CleanCachedResult(logfile, errfile):#{{{
+    """Clean outdated cahced results on the server"""
+# clean tmp files
+    msg = "Clean cached results..."
+    date_str = time.strftime(FORMAT_DATETIME)
+    myfunc.WriteFile("[%s] %s\n"%(date_str, msg), logfile, "a", True)
+    cmd = [python_exec, "%s/clean_cached_result.py"%(rundir), "-max-keep-day", "480"]
+    RunCmd(cmd, logfile, errfile)
 #}}}
