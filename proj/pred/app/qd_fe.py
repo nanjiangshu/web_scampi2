@@ -1391,9 +1391,6 @@ def main(g_params):#{{{
         for node in avail_computenode_list:
             remotequeueDict[node] = []
         for jobid in runjobidlist:
-            lock_file = "%s/%s/%s"%(path_result, jobid, "runjob.lock")
-            if os.path.exists(lock_file):
-                continue
             rstdir = "%s/%s"%(path_result, jobid)
             remotequeue_idx_file = "%s/remotequeue_seqindex.txt"%(rstdir)
             if os.path.exists(remotequeue_idx_file):
@@ -1456,12 +1453,15 @@ def main(g_params):#{{{
                         rstdir = "%s/%s"%(path_result, jobid)
                         finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
                         status = strs[1]
+                        myfunc.WriteFile("CompNodeStatus: %s\n"%(str(cntSubmitJobDict)), gen_logfile, "a", True)
 
-                        lock_file = "%s/%s/%s.lock"%(path_result, jobid, "runjob.lock")
-                        if os.path.exists(lock_file):
+                        runjob_lockfile = "%s/%s/%s.lock"%(path_result, jobid, "runjob.lock")
+                        if os.path.exists(runjob_lockfile):
+                            msg = "runjob_lockfile %s exists, ignore the job %s" %(runjob_lockfile, jobid)
+                            date_str = time.strftime(g_params['FORMAT_DATETIME'])
+                            myfunc.WriteFile("[%s] %s\n"%(date_str, msg), gen_logfile, "a", True)
                             continue
 
-                        myfunc.WriteFile("CompNodeStatus: %s\n"%(str(cntSubmitJobDict)), gen_logfile, "a", True)
                         if IsHaveAvailNode(cntSubmitJobDict):
                             if not g_params['DEBUG_NO_SUBMIT']:
                                 SubmitJob(jobid, cntSubmitJobDict, numseq_this_user)
