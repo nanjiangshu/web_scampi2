@@ -8,7 +8,7 @@ pysqlite==2.8.3
 lxml==4.2.5
 suds==0.4
 biopython==1.72
-numpy==1.15.4
+numpy==1.17.3
 
 pytz==2018.5
 python-dateutil==2.7.3
