@@ -1155,7 +1155,7 @@ def RunStatistics(path_result, path_log):#{{{
     allfinishedjoblogfile = "%s/all_finished_job.log"%(path_log)
     runtimelogfile = "%s/jobruntime.log"%(path_log)
     runtimelogfile_finishedjobid = "%s/jobruntime_finishedjobid.log"%(path_log)
-    submitjoblogfile = "%s/submitted_seq.log"%(path_log)
+    allsubmitjoblogfile = "%s/all_submitted_seq.log"%(path_log)
     if not os.path.exists(path_stat):
         os.mkdir(path_stat)
 
@@ -1331,21 +1331,22 @@ def RunStatistics(path_result, path_log):#{{{
         dt = dictlist[i]
         outfile = flist[i]
         sortedlist = sorted(dt.items(), key = lambda x:x[0])
-        try:
-            fpout = open(outfile,"w")
-            for j in xrange(len(sortedlist)):
-                nseq = sortedlist[j][0]
-                count = sortedlist[j][1]
-                fpout.write("%d\t%d\n"%(nseq,count))
-            fpout.close()
-            #plot
-            cmd = ["%s/app/plot_numseq_of_job.sh"%(basedir), outfile]
-            webcom.RunCmd(cmd, gen_logfile, gen_errfile)
-        except IOError:
-            continue
-    cmd = ["%s/app/plot_numseq_of_job_mtp.sh"%(basedir), "-web",
-            outfile_numseqjob_web, "-wsdl", outfile_numseqjob_wsdl]
-    webcom.RunCmd(cmd, gen_logfile, gen_errfile)
+        if os.path.getsize(outfile) > 0:
+            try:
+                fpout = open(outfile,"w")
+                for j in xrange(len(sortedlist)):
+                    nseq = sortedlist[j][0]
+                    count = sortedlist[j][1]
+                    fpout.write("%d\t%d\n"%(nseq,count))
+                fpout.close()
+                cmd = ["%s/app/plot_numseq_of_job.sh"%(basedir), outfile]
+                webcom.RunCmd(cmd, gen_logfile, gen_errfile)
+            except IOError:
+                continue
+    if os.path.getsize(outfile_numseqjob_wsdl) > 0:
+        cmd = ["%s/app/plot_numseq_of_job_mtp.sh"%(basedir), "-web",
+                outfile_numseqjob_web, "-wsdl", outfile_numseqjob_wsdl]
+        webcom.RunCmd(cmd, gen_logfile, gen_errfile)
 
 #}}}
 
