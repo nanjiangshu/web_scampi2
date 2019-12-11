@@ -286,7 +286,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 # do not sendmail at the cloud VM
         if webcom.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
             webcom.SendEmail_on_finish(jobid, g_params['base_www_url'],
-                    finish_status, name_server="SCAMPI2-msa", from_email="no-reply.SCAMPI@scampi.bioinfo.se",
+                    finish_status, name_server="SCAMPI2-msa", from_email="no-reply.SCAMPI@bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
     return 0
@@ -370,7 +370,7 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 # do not sendmail at the cloud VM
     if webcom.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
         webcom.SendEmail_on_finish(jobid, g_params['base_www_url'],
-                finish_status, name_server="SCAMPI2-single", from_email="no-reply.SCAMPI@scampi.bioinfo.se",
+                finish_status, name_server="SCAMPI2-single", from_email="no-reply.SCAMPI@bioinfo.se",
                 to_email=email, contact_email=contact_email,
                 logfile=runjob_logfile, errfile=runjob_errfile)
     return 0
