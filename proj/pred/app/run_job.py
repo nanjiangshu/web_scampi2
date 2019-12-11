@@ -131,7 +131,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     if hdl.failure:
         isOK = False
     else:
-        webserver_common.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
+        webcom.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
         cnt = 0
         origpath = os.getcwd()
         con = sqlite3.connect(db_cache_SCAMPI2MSA)
@@ -223,11 +223,11 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             numCPU = 4
             outtopfile = "%s/query.top"%(tmp_outpath_this_seq)
             cmd = [runscript_msa, seqfile_this_seq, outtopfile, blastdir, blastdb]
-            (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
+            (t_success, runtime_in_sec) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
             if os.path.exists(tmp_outpath_this_seq):
                 cmd = ["mv","-f", tmp_outpath_this_seq, outpath_this_seq]
-                (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
+                (isCmdSuccess, t_runtime) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
                 if isCmdSuccess:
                     runtime = runtime_in_sec #in seconds
@@ -250,12 +250,12 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
     if not g_params['isOnlyGetCache'] or len(toRunDict) == 0:
         if os.path.exists(finished_seq_file):
-            webserver_common.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
+            webcom.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
 
 # now write the text output to a single file
         dumped_resultfile = "%s/%s"%(outpath_result, "query.top")
         statfile = "%s/%s"%(outpath_result, "stat.txt")
-        webserver_common.WriteSCAMPI2MSATextResultFile(dumped_resultfile, outpath_result, maplist,
+        webcom.WriteSCAMPI2MSATextResultFile(dumped_resultfile, outpath_result, maplist,
                 all_runtime_in_sec, g_params['base_www_url'], statfile=statfile)
 
 
@@ -263,7 +263,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
         pwd = os.getcwd()
         os.chdir(outpath)
         cmd = ["zip", "-rq", zipfile, resultpathname]
-        webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+        webcom.RunCmd(cmd, runjob_logfile, runjob_errfile)
         os.chdir(pwd)
 
 
@@ -274,7 +274,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             shutil.rmtree(tmpdir) #DEBUG, keep tmpdir
         else:
             isSuccess = False
-            webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
+            webcom.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
         finish_status = "" #["success", "failed", "partly_failed"]
         if isSuccess:
@@ -284,8 +284,8 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 # send the result to email
 # do not sendmail at the cloud VM
-        if webserver_common.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
-            webserver_common.SendEmail_on_finish(jobid, g_params['base_www_url'],
+        if webcom.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
+            webcom.SendEmail_on_finish(jobid, g_params['base_www_url'],
                     finish_status, name_server="SCAMPI2-msa", from_email="SCAMPI@scampi.bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
@@ -337,14 +337,14 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
 
 
     if isOK:
-        webserver_common.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
+        webcom.WriteDateTimeTagFile(starttagfile, runjob_logfile, runjob_errfile)
 
         cmd = [runscript_single, infile,  tmp_outfile]
-        (t_success, runtime_in_sec) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
+        (t_success, runtime_in_sec) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile, verbose=True)
 
         if os.path.exists(tmp_outfile):
             cmd = ["mv","-f", tmp_outfile, outfile]
-            (isCmdSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+            (isCmdSuccess, t_runtime) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile)
             if isCmdSuccess:
                 runtime = runtime_in_sec #in seconds
 
@@ -354,7 +354,7 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                 g_params['runjob_err'].append(rt_msg)
 
         if os.path.exists(outfile):
-            webserver_common.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
+            webcom.WriteDateTimeTagFile(finishtagfile, runjob_logfile, runjob_errfile)
 
 
     isSuccess = False
@@ -364,12 +364,12 @@ def RunJob_single(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     else:
         isSuccess = False
         finish_status = "failed"
-        webserver_common.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
+        webcom.WriteDateTimeTagFile(failtagfile, runjob_logfile, runjob_errfile)
 
 # send the result to email
 # do not sendmail at the cloud VM
-    if webserver_common.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
-        webserver_common.SendEmail_on_finish(jobid, g_params['base_www_url'],
+    if webcom.IsFrontEndNode(g_params['base_www_url']) and myfunc.IsValidEmailAddress(email):
+        webcom.SendEmail_on_finish(jobid, g_params['base_www_url'],
                 finish_status, name_server="SCAMPI2-single", from_email="SCAMPI@scampi.bioinfo.se",
                 to_email=email, contact_email=contact_email,
                 logfile=runjob_logfile, errfile=runjob_errfile)
