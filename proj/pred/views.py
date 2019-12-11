@@ -34,10 +34,27 @@ import math
 import shutil
 import json
 
-TZ = "Europe/Stockholm"
+SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
+progname =  os.path.basename(__file__)
+rootname_progname = os.path.splitext(progname)[0]
+path_app = "%s/app"%(SITE_ROOT)
+sys.path.append(path_app)
+path_log = "%s/static/log"%(SITE_ROOT)
+path_stat = "%s/stat"%(path_log)
+path_result = "%s/static/result"%(SITE_ROOT)
+path_tmp = "%s/static/tmp"%(SITE_ROOT)
+path_md5 = "%s/static/md5"%(SITE_ROOT)
+
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
+
+TZ = webcom.TZ
 os.environ['TZ'] = TZ
-FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
 time.tzset()
+
+# for dealing with IP address and country names
+from geoip import geolite2
+import pycountry
 
 from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
@@ -61,32 +78,12 @@ g_params['MAX_ALLOWD_NUMSEQ_single'] = 100000
 g_params['MAX_ALLOWD_NUMSEQ_msa'] = 100
 g_params['MIN_LEN_SEQ']=10
 g_params['MAX_LEN_SEQ']=10000
-
-SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
-progname =  os.path.basename(__file__)
-rootname_progname = os.path.splitext(progname)[0]
-path_app = "%s/app"%(SITE_ROOT)
-sys.path.append(path_app)
-path_log = "%s/static/log"%(SITE_ROOT)
-path_stat = "%s/stat"%(path_log)
-path_result = "%s/static/result"%(SITE_ROOT)
-path_tmp = "%s/static/tmp"%(SITE_ROOT)
-path_md5 = "%s/static/md5"%(SITE_ROOT)
+g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
 
 suq_basedir = "/tmp"
-if os.path.exists("/scratch"):
-    suq_basedir = "/scratch"
-elif os.path.exists("/tmp"):
-    suq_basedir = "/tmp"
 suq_exec = "/usr/bin/suq";
 
 python_exec = os.path.realpath("%s/../../env/bin/python"%(SITE_ROOT))
-
-
-import myfunc
-import webserver_common
-
-rundir = SITE_ROOT
 
 qd_fe_scriptfile = "%s/qd_fe.py"%(path_app)
 gen_errfile = "%s/static/log/%s.err"%(SITE_ROOT, progname)
@@ -431,27 +428,6 @@ def WaitForResult(jobid, MAX_WAIT_TIME=2):#{{{
             break
         if cnt_time > MAX_WAIT_TIME:
             break
-#}}}
-def GetNumSameUserInQueue(rstdir, host_ip, email):#{{{
-    numseq_this_user = 1
-    logfile = "%s/runjob.log"%(rstdir)
-    cmd = [suq_exec, "-b", suq_basedir, "ls"]
-    cmdline = " ".join(cmd)
-    myfunc.WriteFile("cmdline: " + cmdline +"\n", logfile, "a")
-    try:
-        suq_ls_content =  myfunc.check_output(cmd, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        myfunc.WriteFile(str(e) +"\n", logfile, "a")
-        return numseq_this_user
-
-    if email != "" or host_ip != "":
-        lines = suq_ls_content.split("\n")
-        for line in lines:
-            if ((email != "" and line.find(email) != -1) or
-                (host_ip != "" and line.find(host_ip) != -1)):
-                numseq_this_user += 1
-
-    return numseq_this_user
 #}}}
 
 def RunQuery(request, query):#{{{
@@ -1136,7 +1112,7 @@ def get_serverstatus(request):#{{{
     cmd = [suq_exec, "-b", suq_basedir, "ls"]
     cmdline = " ".join(cmd)
     try:
-        suq_ls_content =  myfunc.check_output(cmd, stderr=subprocess.STDOUT)
+        suq_ls_content =  subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         lines = suq_ls_content.split("\n")
         cntjob = 0
         for line in lines:
@@ -1144,8 +1120,7 @@ def get_serverstatus(request):#{{{
                 cntjob += 1
         num_seq_in_local_queue = cntjob
     except subprocess.CalledProcessError as e:
-        datetime = time.strftime(FORMAT_DATETIME)
-        myfunc.WriteFile("[%s] %s\n"%(datetime, str(e)), gen_errfile, "a")
+        webcom.loginfo("Run '%s' exit with error message: %s"%(cmdline, str(e)), gen_errfile)
 
 # get number of finished seqs
     finishedjoblogfile = "%s/all_finished_job.log"%(path_log)
