@@ -1146,7 +1146,7 @@ def get_serverstatus(request):#{{{
     cmd = [suq_exec, "-b", suq_basedir, "ls"]
     cmdline = " ".join(cmd)
     try:
-        suq_ls_content =  subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        suq_ls_content =  subprocess.check_output(cmd, encoding='UTF-8', stderr=subprocess.STDOUT)
         lines = suq_ls_content.split("\n")
         cntjob = 0
         for line in lines:
