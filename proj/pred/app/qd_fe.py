@@ -18,8 +18,8 @@ site.addsitedir("%s/env/lib/python2.7/site-packages/"%(webserver_root))
 sys.path.append("%s/env/lib/python2.7/site-packages/"%(webserver_root))
 sys.path.append("/usr/local/lib/python2.7/dist-packages")
 
-import myfunc
-import webserver_common as webcom
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
 import time
 from datetime import datetime
 from dateutil import parser as dtparser
@@ -81,6 +81,7 @@ usage_exp="""
 """
 
 basedir = os.path.realpath("%s/.."%(rundir)) # path of the application, i.e. pred/
+path_static = "%s/static"%(basedir)
 path_log = "%s/static/log"%(basedir)
 path_stat = "%s/stat"%(path_log)
 path_result = "%s/static/result"%(basedir)
@@ -636,7 +637,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                     wsdl_url), gen_errfile, "a", True)
                 break
 
-            [cnt, maxnum] = cntSubmitJobDict[node]
+            [cnt, maxnum, queue_method] = cntSubmitJobDict[node]
             MAX_SUBMIT_TRY = 3
             cnttry = 0
             while cnt < maxnum and iToRun < numToRun:
@@ -676,6 +677,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                 if len(seq) > 0:
                     query_para = {}
                     query_para['name_software'] = "scampi2-msa"
+                    query_para['queue_method'] = queue_method
 
                     para_str = json.dumps(query_para, sort_keys=True)
                     jobname = ""
@@ -1375,12 +1377,9 @@ def main(g_params):#{{{
             g_params['blackiplist'] = myfunc.ReadIDList(black_iplist_file)
 
         date_str = time.strftime(g_params['FORMAT_DATETIME'])
-        avail_computenode_list = myfunc.ReadIDList2(computenodefile, col=0)
-        num_avail_node = len(avail_computenode_list)
-        if loop == 0:
-            myfunc.WriteFile("[Date: %s] start %s. loop %d\n"%(date_str, progname, loop), gen_logfile, "a", True)
-        else:
-            myfunc.WriteFile("[Date: %s] loop %d\n"%(date_str, loop), gen_logfile, "a", True)
+        avail_computenode = webcom.ReadComputeNode(computenodefile) # return value is a dict
+        num_avail_node = len(avail_computenode)
+        webcom.loginfo("loop %d"%(loop), gen_logfile)
 
         CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,
                 finishedjoblogfile, loop)
@@ -1389,7 +1388,7 @@ def main(g_params):#{{{
         # runjoblogfile
         runjobidlist = myfunc.ReadIDList2(runjoblogfile,0)
         remotequeueDict = {}
-        for node in avail_computenode_list:
+        for node in avail_computenode:
             remotequeueDict[node] = []
         for jobid in runjobidlist:
             rstdir = "%s/%s"%(path_result, jobid)
@@ -1406,30 +1405,23 @@ def main(g_params):#{{{
                             remotequeueDict[node].append(remotejobid)
 
 
-        if loop % 500 == 10:
+        if loop % g_params['STATUS_UPDATE_FREQUENCY'][0] == g_params['STATUS_UPDATE_FREQUENCY'][1]:
             RunStatistics(path_result, path_log)
             webcom.DeleteOldResult(path_result, path_log, gen_logfile, MAX_KEEP_DAYS=g_params['MAX_KEEP_DAYS'])
-            webcom.CleanServerFile(gen_logfile, gen_errfile)
+            webcom.CleanServerFile(path_static, gen_logfile, gen_errfile)
+        webcom.ArchiveLogFile(path_log, threshold_logfilesize=threshold_logfilesize) 
 
-        for f in [gen_logfile, gen_errfile,
-                "%s/restart_qd_fe.cgi.log"%(path_log),
-                "%s/debug.log"%(path_log),
-                "%s/submit_job_to_queue.py.log"%(path_log)
-                ]:
-            if os.path.exists(f):
-                myfunc.ArchiveFile(f, threshold_logfilesize)
         # For finished jobs, clean data not used for caching
-
         cntSubmitJobDict = {} # format of cntSubmitJobDict {'node_ip': INT, 'node_ip': INT}
-        for node in avail_computenode_list:
-            #num_queue_job = GetNumSuqJob(node)
+        for node in avail_computenode:
+            queue_method = avail_computenode[node]['queue_method']
             num_queue_job = len(remotequeueDict[node])
             if num_queue_job >= 0:
                 cntSubmitJobDict[node] = [num_queue_job,
-                        g_params['MAX_SUBMIT_JOB_PER_NODE']] #[num_queue_job, max_allowed_job]
+                        g_params['MAX_SUBMIT_JOB_PER_NODE'], queue_method]
             else:
                 cntSubmitJobDict[node] = [g_params['MAX_SUBMIT_JOB_PER_NODE'],
-                        g_params['MAX_SUBMIT_JOB_PER_NODE']] #[num_queue_job, max_allowed_job]
+                        g_params['MAX_SUBMIT_JOB_PER_NODE'], queue_method]
 
 # entries in runjoblogfile includes jobs in queue or running
         hdl = myfunc.ReadLineByBlock(runjoblogfile)
@@ -1472,10 +1464,9 @@ def main(g_params):#{{{
                 lines = hdl.readlines()
             hdl.close()
 
-        myfunc.WriteFile("sleep for %d seconds\n"%(g_params['SLEEP_INTERVAL']), gen_logfile, "a", True)
+        webcom.loginfo("sleep for %d seconds"%(g_params['SLEEP_INTERVAL']), gen_logfile)
         time.sleep(g_params['SLEEP_INTERVAL'])
         loop += 1
-
 
     return 0
 #}}}
@@ -1493,14 +1484,14 @@ def InitGlobalParameter():#{{{
     g_params['MAX_TIME_IN_REMOTE_QUEUE'] = 3600*24 # one day in seconds
     g_params['MAX_KEEP_DAYS'] = 60
     g_params['MAX_RESUBMIT'] = 2
+    g_params['TZ'] = "Europe/Stockholm"
     g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
+    g_params['STATUS_UPDATE_FREQUENCY'] = [500, 50]  # updated by if loop%$1 == $2
     return g_params
 #}}}
 if __name__ == '__main__' :
     g_params = InitGlobalParameter()
-
     date_str = time.strftime(g_params['FORMAT_DATETIME'])
-    print("\n\n[Date: %s]\n"%(date_str), file=sys.stderr)
-    status = main(g_params)
-
-    sys.exit(status)
+    print("\n#%s#\n[Date: %s] qd_fe.py restarted"%('='*80,date_str))
+    sys.stdout.flush()
+    sys.exit(main(g_params))
