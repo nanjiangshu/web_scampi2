@@ -1,6 +1,8 @@
 from django.conf.urls import url
 
 #import modules for spyne (wsdl interface)
+from spyne.protocol.soap import Soap11
+from spyne.server.django import DjangoView
 
 #import modules for authentication
 from django.contrib.auth.decorators import login_required
@@ -20,6 +22,7 @@ urlpatterns = [
     url(r'^help/$', views.get_help, name='pred.get_help'),
     url(r'^news/$', views.get_news, name='pred.get_news'),
     url(r'^serverstatus/$', views.get_serverstatus, name='pred.get_serverstatus'),
+    url(r'^countjobcountry/$', views.get_countjob_country, name='pred.get_countjob_country'),
     url(r'^reference/$', views.get_reference, name='pred.get_reference'),
     url(r'^example/$', views.get_example, name='pred.get_example'),
     url(r'^oldtopcons/$', views.oldtopcons, name='pred.oldtopcons'),
