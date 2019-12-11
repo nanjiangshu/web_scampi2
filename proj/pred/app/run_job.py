@@ -79,9 +79,9 @@ Examples:
 """%(progname)
 
 def PrintHelp(fpout=sys.stdout):#{{{
-    print >> fpout, usage_short
-    print >> fpout, usage_ext
-    print >> fpout, usage_exp#}}}
+    print(usage_short, file=fpout)
+    print(usage_ext, file=fpout)
+    print(usage_exp, file=fpout)#}}}
 
 def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
     all_begin_time = time.time()
@@ -188,7 +188,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
             dumplist.append(">%s\n%s"%(str(key), top))
         myfunc.WriteFile("\n".join(dumplist)+"\n", torun_all_seqfile, "w")
         del dumplist
-        sortedlist = sorted(toRunDict.items(), key=lambda x:x[1][1], reverse=True)
+        sortedlist = sorted(list(toRunDict.items()), key=lambda x:x[1][1], reverse=True)
         #format of sortedlist [(origIndex: [seq, numTM, description]), ...]
         # submit sequences one by one to the workflow according to orders in
         # sortedlist
@@ -428,35 +428,35 @@ def main(g_params):#{{{
                 g_params['isOnlyGetCache'] = True
                 i += 1
             else:
-                print >> sys.stderr, "Error! Wrong argument:", argv[i]
+                print("Error! Wrong argument:", argv[i], file=sys.stderr)
                 return 1
         else:
             infile = argv[i]
             i += 1
 
     if jobid == "":
-        print >> sys.stderr, "%s: jobid not set. exit"%(sys.argv[0])
+        print("%s: jobid not set. exit"%(sys.argv[0]), file=sys.stderr)
         return 1
 
     if myfunc.checkfile(infile, "infile") != 0:
         return 1
     if outpath == "":
-        print >> sys.stderr, "outpath not set. exit"
+        print("outpath not set. exit", file=sys.stderr)
         return 1
     elif not os.path.exists(outpath):
         try:
             os.makedirs(outpath)
         except Exception as e:
-            print >> sys.stderr, e
+            print(e, file=sys.stderr)
             return 1
     if tmpdir == "":
-        print >> sys.stderr, "tmpdir not set. exit"
+        print("tmpdir not set. exit", file=sys.stderr)
         return 1
     elif not os.path.exists(tmpdir):
         try:
             os.makedirs(tmpdir)
         except Exception as e:
-            print >> sys.stderr, e
+            print(e, file=sys.stderr)
             return 1
 
     numseq = myfunc.CountFastaSeq(infile)
