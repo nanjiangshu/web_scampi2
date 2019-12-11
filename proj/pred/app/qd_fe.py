@@ -1442,7 +1442,7 @@ def main(g_params):#{{{
                         rstdir = "%s/%s"%(path_result, jobid)
                         finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
                         status = strs[1]
-                        webcom.logfile("CompNodeStatus: %s"%(str(cntSubmitJobDict)), gen_logfile)
+                        webcom.loginfo("CompNodeStatus: %s"%(str(cntSubmitJobDict)), gen_logfile)
                         runjob_lockfile = "%s/%s/%s.lock"%(path_result, jobid, "runjob.lock")
                         if os.path.exists(runjob_lockfile):
                             msg = "runjob_lockfile %s exists, ignore the job %s" %(runjob_lockfile, jobid)
