@@ -150,7 +150,7 @@ def RunJob_msa(infile, outpath, tmpdir, email, jobid, g_params):#{{{
                 for rd in recordList:
                     isSkip = False
                     if not g_params['isForceRun']:
-                        md5_key = hashlib.md5(rd.seq).hexdigest()
+                        md5_key = hashlib.md5(rd.seq.encode('utf-8')).hexdigest()
                         cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
                                 dbmsa_tablename, md5_key)
                         cur.execute(cmd)

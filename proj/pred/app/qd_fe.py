@@ -556,7 +556,7 @@ def SubmitJob(jobid, cntSubmitJobDict, numseq_this_user):#{{{
                 description = seqAnnoList[i]
                 if not str(i) in init_finished_idx_set:
                     isSkip = False
-                    md5_key = hashlib.md5(seq).hexdigest()
+                    md5_key = hashlib.md5(seq.encode('utf-8')).hexdigest()
                     cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
                             dbmsa_tablename, md5_key)
                     cur.execute(cmd)
@@ -914,7 +914,7 @@ def GetResult(jobid):#{{{
 
                             if isSuccess:
                                 # create or update the md5 cache
-                                md5_key = hashlib.md5(seq).hexdigest()
+                                md5_key = hashlib.md5(seq.encode('utf-8')).hexdigest()
                                 predfile = "%s/query.top"%( outpath_this_seq)
                                 (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
                                 if len(top) == len(seq):
@@ -1321,7 +1321,7 @@ def RunStatistics(path_result, path_log):#{{{
     li_str.append("#Country\tNumSeq\tNumJob\tNumIP")
     for li in li_countjob:
         li_str.append("%s\t%d\t%d\t%d"%(li[0], li[1][0], li[1][1], len(li[1][2])))
-    myfunc.WriteFile(("\n".join(li_str)+"\n").encode('utf-8'), outfile_countjob_by_country, "w", True)
+    myfunc.WriteFile(("\n".join(li_str)+"\n").encode('utf-8'), outfile_countjob_by_country, "wb", True)
 
     flist = [outfile_numseqjob, outfile_numseqjob_web, outfile_numseqjob_wsdl  ]
     dictlist = [countjob_numseq_dict, countjob_numseq_dict_web, countjob_numseq_dict_wsdl]
