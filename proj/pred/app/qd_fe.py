@@ -151,13 +151,6 @@ def GetNumSuqJob(node):#{{{
         return -1
 
 #}}}
-def IsHaveAvailNode(cntSubmitJobDict):#{{{
-    for node in cntSubmitJobDict:
-        [num_queue_job, max_allowed_job] = cntSubmitJobDict[node]
-        if num_queue_job < max_allowed_job:
-            return True
-    return False
-#}}}
 def GetNumSeqSameUserDict(joblist):#{{{
 # calculate the number of sequences for each user in the queue or running
 # Fixed error for getting numseq at 2015-04-11
@@ -461,7 +454,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
         myfunc.WriteFile("", runjoblogfile, "w", True)
 
 #}}}
-def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
+def SubmitJob(jobid, cntSubmitJobDict, numseq_this_user):#{{{
 # for each job rstdir, keep three log files, 
 # 1.seqs finished, finished_seq log keeps all information, finished_index_log
 #   can be very compact to speed up reading, e.g.
@@ -732,7 +725,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                     if g_params['DEBUG']:
                         myfunc.WriteFile("DEBUG: jobid %s processedIndexSet.add(str(%d))\n"%(jobid, origIndex), gen_logfile, "a", True)
             # update cntSubmitJobDict for this node
-            cntSubmitJobDict[node] = [cnt, maxnum]
+            cntSubmitJobDict[node][0] = cnt
 
     # finally, append submitted_loginfo_list to remotequeue_idx_file 
     if len(submitted_loginfo_list)>0:
@@ -1449,8 +1442,7 @@ def main(g_params):#{{{
                         rstdir = "%s/%s"%(path_result, jobid)
                         finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
                         status = strs[1]
-                        myfunc.WriteFile("CompNodeStatus: %s\n"%(str(cntSubmitJobDict)), gen_logfile, "a", True)
-
+                        webcom.logfile("CompNodeStatus: %s"%(str(cntSubmitJobDict)), gen_logfile)
                         runjob_lockfile = "%s/%s/%s.lock"%(path_result, jobid, "runjob.lock")
                         if os.path.exists(runjob_lockfile):
                             msg = "runjob_lockfile %s exists, ignore the job %s" %(runjob_lockfile, jobid)
@@ -1458,7 +1450,7 @@ def main(g_params):#{{{
                             myfunc.WriteFile("[%s] %s\n"%(date_str, msg), gen_logfile, "a", True)
                             continue
 
-                        if IsHaveAvailNode(cntSubmitJobDict):
+                        if webcom.IsHaveAvailNode(cntSubmitJobDict):
                             if not g_params['DEBUG_NO_SUBMIT']:
                                 SubmitJob(jobid, cntSubmitJobDict, numseq_this_user)
                         GetResult(jobid) # the start tagfile is written when got the first result
