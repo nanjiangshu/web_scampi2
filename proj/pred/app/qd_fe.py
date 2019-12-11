@@ -1140,7 +1140,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         # send the result to email
         if webcom.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
             webcom.SendEmail_on_finish(jobid, base_www_url,
-                    finish_status, name_server="SCAMPI2", from_email="SCAMPI@scampi.bioinfo.se",
+                    finish_status, name_server="SCAMPI2", from_email="no-reply.SCAMPI@scampi.bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
         webcom.CleanJobFolder_Scampi(rstdir)
