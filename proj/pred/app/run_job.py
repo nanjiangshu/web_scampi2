@@ -11,8 +11,8 @@
 import os
 import sys
 import time
-import myfunc
-import webserver_common
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
 import glob
 import hashlib
 import shutil
