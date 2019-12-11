@@ -185,7 +185,7 @@ def GetJobCounter(info): #{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                    submit_date = webcom.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
 
@@ -330,7 +330,7 @@ def submit_seq(request):#{{{
             query['username'] = info['username']
             query['STATIC_URL'] = settings.STATIC_URL
 
-            is_valid = webserver_common.ValidateQuery(request, query, g_params)
+            is_valid = webcom.ValidateQuery(request, query, g_params)
 
             if is_valid:
                 jobid = RunQuery(request, query)
@@ -365,7 +365,7 @@ def submit_seq(request):#{{{
                 cmd = [qd_fe_scriptfile]
                 base_www_url = "http://" + request.META['HTTP_HOST']
                 # run the daemon only at the frontend
-                if webserver_common.IsFrontEndNode(base_www_url):
+                if webcom.IsFrontEndNode(base_www_url):
                     cmd = "nohup %s %s &"%(python_exec, qd_fe_scriptfile)
                     os.system(cmd)
 
@@ -564,9 +564,9 @@ def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
     if isOnlyGetCache:
         cmd += ["-only-get-cache"]
 
-    (isSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+    (isSuccess, t_runtime) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile)
     if not isSuccess:
-        webserver_common.WriteDateTimeTagFile(failedtagfile, runjob_logfile, runjob_errfile)
+        webcom.WriteDateTimeTagFile(failedtagfile, runjob_logfile, runjob_errfile)
         return 1
     else:
         return 0
@@ -657,7 +657,7 @@ def get_queue(request):#{{{
             runtime = ""
             isValidSubmitDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
@@ -765,12 +765,12 @@ def get_running(request):#{{{
             isValidSubmitDate = True
             isValidStartDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = webserver_common.datetime_str_to_time(start_date_str)
+                start_date = webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             if isValidStartDate:
@@ -824,7 +824,7 @@ def get_finished_job(request):#{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                    submit_date = webcom.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
                 if not isValidSubmitDate:
@@ -893,17 +893,17 @@ def get_finished_job(request):#{{{
             isValidStartDate = True
             isValidFinishDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date =  webserver_common.datetime_str_to_time(start_date_str)
+                start_date =  webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
+                finish_date = webcom.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
 
@@ -959,7 +959,7 @@ def get_failed_job(request):#{{{
                     continue
 
                 submit_date_str = strs[0]
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
                 diff_date = current_time - submit_date
                 if diff_date.days > info['MAX_DAYS_TO_SHOW']:
                     continue
@@ -1024,18 +1024,18 @@ def get_failed_job(request):#{{{
             isValidSubmitDate = True
 
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date =  webserver_common.datetime_str_to_time(start_date_str)
+                start_date =  webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             failed_date_str = myfunc.ReadFile(failtagfile).strip()
             try:
-                failed_date = webserver_common.datetime_str_to_time(failed_date_str)
+                failed_date = webcom.datetime_str_to_time(failed_date_str)
             except ValueError:
                 isValidFailedDate = False
 
@@ -1310,7 +1310,7 @@ def get_results(request, jobid="1"):#{{{
 
     isValidSubmitDate = True
     try:
-        submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+        submit_date = webcom.datetime_str_to_time(submit_date_str)
     except ValueError:
         isValidSubmitDate = False
     current_time = datetime.now(timezone(TZ))
@@ -1335,12 +1335,12 @@ def get_results(request, jobid="1"):#{{{
         isValidStartDate = True
         isValidFailedDate = True
         try:
-            start_date = webserver_common.datetime_str_to_time(start_date_str)
+            start_date = webcom.datetime_str_to_time(start_date_str)
         except ValueError:
             isValidStartDate = False
         failed_date_str = myfunc.ReadFile(failtagfile).strip()
         try:
-            failed_date = webserver_common.datetime_str_to_time(failed_date_str)
+            failed_date = webcom.datetime_str_to_time(failed_date_str)
         except ValueError:
             isValidFailedDate = False
         if isValidSubmitDate and isValidStartDate:
@@ -1357,12 +1357,12 @@ def get_results(request, jobid="1"):#{{{
             isValidFinishDate = True
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = webserver_common.datetime_str_to_time(start_date_str)
+                start_date = webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
+                finish_date = webcom.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
             if isValidSubmitDate and isValidStartDate:
@@ -1375,7 +1375,7 @@ def get_results(request, jobid="1"):#{{{
                 isValidStartDate = True
                 start_date_str = myfunc.ReadFile(starttagfile).strip()
                 try:
-                    start_date = webserver_common.datetime_str_to_time(start_date_str)
+                    start_date = webcom.datetime_str_to_time(start_date_str)
                 except ValueError:
                     isValidStartDate = False
                 resultdict['isStarted'] = True
@@ -1490,7 +1490,7 @@ def get_results(request, jobid="1"):#{{{
         start_date_str = myfunc.ReadFile(starttagfile).strip()
         isValidStartDate = False
         try:
-            start_date_epoch = webserver_common.datetime_str_to_epoch(start_date_str)
+            start_date_epoch = webcom.datetime_str_to_epoch(start_date_str)
             isValidStartDate = True
         except:
             pass
