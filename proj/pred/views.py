@@ -34,10 +34,27 @@ import math
 import shutil
 import json
 
-TZ = "Europe/Stockholm"
+SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
+progname =  os.path.basename(__file__)
+rootname_progname = os.path.splitext(progname)[0]
+path_app = "%s/app"%(SITE_ROOT)
+sys.path.append(path_app)
+path_log = "%s/static/log"%(SITE_ROOT)
+path_stat = "%s/stat"%(path_log)
+path_result = "%s/static/result"%(SITE_ROOT)
+path_tmp = "%s/static/tmp"%(SITE_ROOT)
+path_md5 = "%s/static/md5"%(SITE_ROOT)
+
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
+
+TZ = webcom.TZ
 os.environ['TZ'] = TZ
-FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S %Z"
 time.tzset()
+
+# for dealing with IP address and country names
+from geoip import geolite2
+import pycountry
 
 from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
@@ -61,32 +78,12 @@ g_params['MAX_ALLOWD_NUMSEQ_single'] = 100000
 g_params['MAX_ALLOWD_NUMSEQ_msa'] = 100
 g_params['MIN_LEN_SEQ']=10
 g_params['MAX_LEN_SEQ']=10000
-
-SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
-progname =  os.path.basename(__file__)
-rootname_progname = os.path.splitext(progname)[0]
-path_app = "%s/app"%(SITE_ROOT)
-sys.path.append(path_app)
-path_log = "%s/static/log"%(SITE_ROOT)
-path_stat = "%s/stat"%(path_log)
-path_result = "%s/static/result"%(SITE_ROOT)
-path_tmp = "%s/static/tmp"%(SITE_ROOT)
-path_md5 = "%s/static/md5"%(SITE_ROOT)
+g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
 
 suq_basedir = "/tmp"
-if os.path.exists("/scratch"):
-    suq_basedir = "/scratch"
-elif os.path.exists("/tmp"):
-    suq_basedir = "/tmp"
 suq_exec = "/usr/bin/suq";
 
 python_exec = os.path.realpath("%s/../../env/bin/python"%(SITE_ROOT))
-
-
-import myfunc
-import webserver_common
-
-rundir = SITE_ROOT
 
 qd_fe_scriptfile = "%s/qd_fe.py"%(path_app)
 gen_errfile = "%s/static/log/%s.err"%(SITE_ROOT, progname)
@@ -188,7 +185,7 @@ def GetJobCounter(info): #{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                    submit_date = webcom.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
 
@@ -234,11 +231,11 @@ def index(request):#{{{
     path_tmp = "%s/static/tmp"%(SITE_ROOT)
     path_md5 = "%s/static/md5"%(SITE_ROOT)
     if not os.path.exists(path_result):
-        os.mkdir(path_result, 0755)
+        os.mkdir(path_result, 0o755)
     if not os.path.exists(path_result):
-        os.mkdir(path_tmp, 0755)
+        os.mkdir(path_tmp, 0o755)
     if not os.path.exists(path_md5):
-        os.mkdir(path_md5, 0755)
+        os.mkdir(path_md5, 0o755)
     base_www_url_file = "%s/static/log/base_www_url.txt"%(SITE_ROOT)
     if not os.path.exists(base_www_url_file):
         base_www_url = "http://" + request.META['HTTP_HOST']
@@ -313,9 +310,9 @@ def submit_seq(request):#{{{
 
             try:
                 seqfile = request.FILES['seqfile']
-            except KeyError, MultiValueDictKeyError:
+            except KeyError as MultiValueDictKeyError:
                 seqfile = ""
-            date_str = time.strftime(FORMAT_DATETIME)
+            date_str = time.strftime(g_params['FORMAT_DATETIME'])
             query = {}
             query['rawseq'] = rawseq
             query['seqfile'] = seqfile
@@ -333,7 +330,7 @@ def submit_seq(request):#{{{
             query['username'] = info['username']
             query['STATIC_URL'] = settings.STATIC_URL
 
-            is_valid = webserver_common.ValidateQuery(request, query, g_params)
+            is_valid = webcom.ValidateQuery(request, query, g_params)
 
             if is_valid:
                 jobid = RunQuery(request, query)
@@ -368,7 +365,7 @@ def submit_seq(request):#{{{
                 cmd = [qd_fe_scriptfile]
                 base_www_url = "http://" + request.META['HTTP_HOST']
                 # run the daemon only at the frontend
-                if webserver_common.IsFrontEndNode(base_www_url):
+                if webcom.IsFrontEndNode(base_www_url):
                     cmd = "nohup %s %s &"%(python_exec, qd_fe_scriptfile)
                     os.system(cmd)
 
@@ -432,34 +429,13 @@ def WaitForResult(jobid, MAX_WAIT_TIME=2):#{{{
         if cnt_time > MAX_WAIT_TIME:
             break
 #}}}
-def GetNumSameUserInQueue(rstdir, host_ip, email):#{{{
-    numseq_this_user = 1
-    logfile = "%s/runjob.log"%(rstdir)
-    cmd = [suq_exec, "-b", suq_basedir, "ls"]
-    cmdline = " ".join(cmd)
-    myfunc.WriteFile("cmdline: " + cmdline +"\n", logfile, "a")
-    try:
-        suq_ls_content =  myfunc.check_output(cmd, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError, e:
-        myfunc.WriteFile(str(e) +"\n", logfile, "a")
-        return numseq_this_user
-
-    if email != "" or host_ip != "":
-        lines = suq_ls_content.split("\n")
-        for line in lines:
-            if ((email != "" and line.find(email) != -1) or
-                (host_ip != "" and line.find(host_ip) != -1)):
-                numseq_this_user += 1
-
-    return numseq_this_user
-#}}}
 
 def RunQuery(request, query):#{{{
     errmsg = []
     tmpdir = tempfile.mkdtemp(prefix="%s/static/tmp/tmp_"%(SITE_ROOT))
     rstdir = tempfile.mkdtemp(prefix="%s/static/result/rst_"%(SITE_ROOT))
-    os.chmod(tmpdir, 0755)
-    os.chmod(rstdir, 0755)
+    os.chmod(tmpdir, 0o755)
+    os.chmod(rstdir, 0o755)
     jobid = os.path.basename(rstdir)
     query['jobid'] = jobid
 
@@ -505,8 +481,8 @@ def RunQuery_wsdl(rawseq, filtered_seq, seqinfo):#{{{
     errmsg = []
     tmpdir = tempfile.mkdtemp(prefix="%s/static/tmp/tmp_"%(SITE_ROOT))
     rstdir = tempfile.mkdtemp(prefix="%s/static/result/rst_"%(SITE_ROOT))
-    os.chmod(tmpdir, 0755)
-    os.chmod(rstdir, 0755)
+    os.chmod(tmpdir, 0o755)
+    os.chmod(rstdir, 0o755)
     jobid = os.path.basename(rstdir)
     seqinfo['jobid'] = jobid
     numseq = seqinfo['numseq']
@@ -536,8 +512,8 @@ def RunQuery_wsdl_local(rawseq, filtered_seq, seqinfo):#{{{
     errmsg = []
     tmpdir = tempfile.mkdtemp(prefix="%s/static/tmp/tmp_"%(SITE_ROOT))
     rstdir = tempfile.mkdtemp(prefix="%s/static/result/rst_"%(SITE_ROOT))
-    os.chmod(tmpdir, 0755)
-    os.chmod(rstdir, 0755)
+    os.chmod(tmpdir, 0o755)
+    os.chmod(rstdir, 0o755)
     jobid = os.path.basename(rstdir)
     seqinfo['jobid'] = jobid
     numseq = seqinfo['numseq']
@@ -588,9 +564,9 @@ def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
     if isOnlyGetCache:
         cmd += ["-only-get-cache"]
 
-    (isSuccess, t_runtime) = webserver_common.RunCmd(cmd, runjob_logfile, runjob_errfile)
+    (isSuccess, t_runtime) = webcom.RunCmd(cmd, runjob_logfile, runjob_errfile)
     if not isSuccess:
-        webserver_common.WriteDateTimeTagFile(failedtagfile, runjob_logfile, runjob_errfile)
+        webcom.WriteDateTimeTagFile(failedtagfile, runjob_logfile, runjob_errfile)
         return 1
     else:
         return 0
@@ -681,7 +657,7 @@ def get_queue(request):#{{{
             runtime = ""
             isValidSubmitDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
@@ -789,12 +765,12 @@ def get_running(request):#{{{
             isValidSubmitDate = True
             isValidStartDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = webserver_common.datetime_str_to_time(start_date_str)
+                start_date = webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             if isValidStartDate:
@@ -848,7 +824,7 @@ def get_finished_job(request):#{{{
                 submit_date_str = strs[0]
                 isValidSubmitDate = True
                 try:
-                    submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                    submit_date = webcom.datetime_str_to_time(submit_date_str)
                 except ValueError:
                     isValidSubmitDate = False
                 if not isValidSubmitDate:
@@ -917,17 +893,17 @@ def get_finished_job(request):#{{{
             isValidStartDate = True
             isValidFinishDate = True
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date =  webserver_common.datetime_str_to_time(start_date_str)
+                start_date =  webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
+                finish_date = webcom.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
 
@@ -983,7 +959,7 @@ def get_failed_job(request):#{{{
                     continue
 
                 submit_date_str = strs[0]
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
                 diff_date = current_time - submit_date
                 if diff_date.days > info['MAX_DAYS_TO_SHOW']:
                     continue
@@ -1048,18 +1024,18 @@ def get_failed_job(request):#{{{
             isValidSubmitDate = True
 
             try:
-                submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+                submit_date = webcom.datetime_str_to_time(submit_date_str)
             except ValueError:
                 isValidSubmitDate = False
 
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date =  webserver_common.datetime_str_to_time(start_date_str)
+                start_date =  webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             failed_date_str = myfunc.ReadFile(failtagfile).strip()
             try:
-                failed_date = webserver_common.datetime_str_to_time(failed_date_str)
+                failed_date = webcom.datetime_str_to_time(failed_date_str)
             except ValueError:
                 isValidFailedDate = False
 
@@ -1092,6 +1068,40 @@ def get_help(request):#{{{
     set_basic_config(request, info)
     info['jobcounter'] = GetJobCounter(info)
     return render(request, 'pred/help.html', info)
+#}}}
+def get_countjob_country(request):#{{{
+    info = {}
+    set_basic_config(request, info)
+
+    countjob_by_country = "%s/countjob_by_country.txt"%(path_stat)
+    lines = myfunc.ReadFile(countjob_by_country).split("\n")
+    li_countjob_country = []
+    for line in lines: 
+        if not line or line[0]=="#":
+            continue
+        strs = line.split("\t")
+        if len(strs) >= 4:
+            country = strs[0]
+            try:
+                numseq = int(strs[1])
+            except:
+                numseq = 0
+            try:
+                numjob = int(strs[2])
+            except:
+                numjob = 0
+            try:
+                numip = int(strs[3])
+            except:
+                numip = 0
+            li_countjob_country.append([country, numseq, numjob, numip])
+    li_countjob_country_header = ["Country", "Numseq", "Numjob", "NumIP"]
+
+    info['li_countjob_country'] = li_countjob_country
+    info['li_countjob_country_header'] = li_countjob_country_header
+
+    info['jobcounter'] = webcom.GetJobCounter(info)
+    return render(request, 'pred/countjob_country.html', info)
 #}}}
 def get_news(request):#{{{
     info = {}
@@ -1136,16 +1146,15 @@ def get_serverstatus(request):#{{{
     cmd = [suq_exec, "-b", suq_basedir, "ls"]
     cmdline = " ".join(cmd)
     try:
-        suq_ls_content =  myfunc.check_output(cmd, stderr=subprocess.STDOUT)
+        suq_ls_content =  subprocess.check_output(cmd, encoding='UTF-8', stderr=subprocess.STDOUT)
         lines = suq_ls_content.split("\n")
         cntjob = 0
         for line in lines:
             if line.find("runjob") != -1:
                 cntjob += 1
         num_seq_in_local_queue = cntjob
-    except subprocess.CalledProcessError, e:
-        datetime = time.strftime(FORMAT_DATETIME)
-        myfunc.WriteFile("[%s] %s\n"%(datetime, str(e)), gen_errfile, "a")
+    except subprocess.CalledProcessError as e:
+        webcom.loginfo("Run '%s' exit with error message: %s"%(cmdline, str(e)), gen_errfile)
 
 # get number of finished seqs
     finishedjoblogfile = "%s/all_finished_job.log"%(path_log)
@@ -1215,7 +1224,7 @@ def help_wsdl_api(request):#{{{
     api_script_lang_list = ["Python"]
     api_script_info_list = []
 
-    for i in xrange(len(extlist)):
+    for i in range(len(extlist)):
         ext = extlist[i]
         api_script_file = "%s/%s/%s"%(SITE_ROOT,
                 "static/download/script", "%s%s"%(api_script_rtname,
@@ -1226,7 +1235,7 @@ def help_wsdl_api(request):#{{{
         cmd = [api_script_file, "-h"]
         try:
             usage = myfunc.check_output(cmd)
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             usage = ""
         api_script_info_list.append([api_script_lang_list[i], api_script_basename, usage])
 
@@ -1301,7 +1310,7 @@ def get_results(request, jobid="1"):#{{{
 
     isValidSubmitDate = True
     try:
-        submit_date = webserver_common.datetime_str_to_time(submit_date_str)
+        submit_date = webcom.datetime_str_to_time(submit_date_str)
     except ValueError:
         isValidSubmitDate = False
     current_time = datetime.now(timezone(TZ))
@@ -1326,12 +1335,12 @@ def get_results(request, jobid="1"):#{{{
         isValidStartDate = True
         isValidFailedDate = True
         try:
-            start_date = webserver_common.datetime_str_to_time(start_date_str)
+            start_date = webcom.datetime_str_to_time(start_date_str)
         except ValueError:
             isValidStartDate = False
         failed_date_str = myfunc.ReadFile(failtagfile).strip()
         try:
-            failed_date = webserver_common.datetime_str_to_time(failed_date_str)
+            failed_date = webcom.datetime_str_to_time(failed_date_str)
         except ValueError:
             isValidFailedDate = False
         if isValidSubmitDate and isValidStartDate:
@@ -1348,12 +1357,12 @@ def get_results(request, jobid="1"):#{{{
             isValidFinishDate = True
             start_date_str = myfunc.ReadFile(starttagfile).strip()
             try:
-                start_date = webserver_common.datetime_str_to_time(start_date_str)
+                start_date = webcom.datetime_str_to_time(start_date_str)
             except ValueError:
                 isValidStartDate = False
             finish_date_str = myfunc.ReadFile(finishtagfile).strip()
             try:
-                finish_date = webserver_common.datetime_str_to_time(finish_date_str)
+                finish_date = webcom.datetime_str_to_time(finish_date_str)
             except ValueError:
                 isValidFinishDate = False
             if isValidSubmitDate and isValidStartDate:
@@ -1366,7 +1375,7 @@ def get_results(request, jobid="1"):#{{{
                 isValidStartDate = True
                 start_date_str = myfunc.ReadFile(starttagfile).strip()
                 try:
-                    start_date = webserver_common.datetime_str_to_time(start_date_str)
+                    start_date = webcom.datetime_str_to_time(start_date_str)
                 except ValueError:
                     isValidStartDate = False
                 resultdict['isStarted'] = True
@@ -1413,7 +1422,7 @@ def get_results(request, jobid="1"):#{{{
     num_finished = 0
     if os.path.exists(finished_seq_file):
         lines = myfunc.ReadFile(finished_seq_file).split("\n")
-        lines = filter(None, lines)
+        lines = [_f for _f in lines if _f]
         num_finished = len(lines)
 
 
@@ -1481,7 +1490,7 @@ def get_results(request, jobid="1"):#{{{
         start_date_str = myfunc.ReadFile(starttagfile).strip()
         isValidStartDate = False
         try:
-            start_date_epoch = webserver_common.datetime_str_to_epoch(start_date_str)
+            start_date_epoch = webcom.datetime_str_to_epoch(start_date_str)
             isValidStartDate = True
         except:
             pass
@@ -1548,7 +1557,7 @@ def get_results(request, jobid="1"):#{{{
     if os.path.exists(topfile):
         (tmpidlist, tmpannolist, tmptoplist) = myfunc.ReadFasta(topfile)
         cnt_TMPro = 0
-        for ii in xrange(len(tmpidlist)):
+        for ii in range(len(tmpidlist)):
             top = tmptoplist[ii]
             lenseq_list.append(len(top))
             if top.find('M') != -1:

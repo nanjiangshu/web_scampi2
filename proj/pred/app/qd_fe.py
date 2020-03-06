@@ -12,21 +12,21 @@ rundir = os.path.dirname(os.path.realpath(__file__))
 webserver_root = os.path.realpath("%s/../../../"%(rundir))
 
 activate_env="%s/env/bin/activate_this.py"%(webserver_root)
-execfile(activate_env, dict(__file__=activate_env))
+exec(compile(open(activate_env, "rb").read(), activate_env, 'exec'), dict(__file__=activate_env))
 #Add the site-packages of the virtualenv
 site.addsitedir("%s/env/lib/python2.7/site-packages/"%(webserver_root))
 sys.path.append("%s/env/lib/python2.7/site-packages/"%(webserver_root))
 sys.path.append("/usr/local/lib/python2.7/dist-packages")
 
-import myfunc
-import webserver_common as webcom
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
 import time
 from datetime import datetime
 from dateutil import parser as dtparser
 from pytz import timezone
 import requests
 import json
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import shutil
 import hashlib
 import subprocess
@@ -55,7 +55,7 @@ fp = open(lock_file, 'w')
 try:
     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except IOError:
-    print >> sys.stderr, "Another instance of %s is running"%(progname)
+    print("Another instance of %s is running"%(progname), file=sys.stderr)
     sys.exit(1)
 
 contact_email = "nanjiang.shu@scilifelab.se"
@@ -81,6 +81,7 @@ usage_exp="""
 """
 
 basedir = os.path.realpath("%s/.."%(rundir)) # path of the application, i.e. pred/
+path_static = "%s/static"%(basedir)
 path_log = "%s/static/log"%(basedir)
 path_stat = "%s/stat"%(path_log)
 path_result = "%s/static/result"%(basedir)
@@ -98,9 +99,9 @@ gen_logfile = "%s/static/log/%s.log"%(basedir, progname)
 black_iplist_file = "%s/config/black_iplist.txt"%(basedir)
 
 def PrintHelp(fpout=sys.stdout):#{{{
-    print >> fpout, usage_short
-    print >> fpout, usage_ext
-    print >> fpout, usage_exp#}}}
+    print(usage_short, file=fpout)
+    print(usage_ext, file=fpout)
+    print(usage_exp, file=fpout)#}}}
 
 def get_job_status(jobid):#{{{
     status = "";
@@ -150,18 +151,11 @@ def GetNumSuqJob(node):#{{{
         return -1
 
 #}}}
-def IsHaveAvailNode(cntSubmitJobDict):#{{{
-    for node in cntSubmitJobDict:
-        [num_queue_job, max_allowed_job] = cntSubmitJobDict[node]
-        if num_queue_job < max_allowed_job:
-            return True
-    return False
-#}}}
 def GetNumSeqSameUserDict(joblist):#{{{
 # calculate the number of sequences for each user in the queue or running
 # Fixed error for getting numseq at 2015-04-11
     numseq_user_dict = {}
-    for i in xrange(len(joblist)):
+    for i in range(len(joblist)):
         li1 = joblist[i]
         jobid1 = li1[0]
         ip1 = li1[3]
@@ -177,7 +171,7 @@ def GetNumSeqSameUserDict(joblist):#{{{
         if ip1 == "" and email1 == "":
             continue
 
-        for j in xrange(len(joblist)):
+        for j in range(len(joblist)):
             li2 = joblist[j]
             if i == j:
                 continue
@@ -317,6 +311,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
 # re-write logs of finished jobs
     li_str = []
     for li in new_finished_list:
+        li = [str(x) for x in li]
         li_str.append("\t".join(li))
     if len(li_str)>0:
         myfunc.WriteFile("\n".join(li_str)+"\n", finishedjoblogfile, "w", True)
@@ -335,6 +330,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                 ip)
         li_str = []
         for li in finished_list_for_this_ip:
+            li = [str(x) for x in li]
             li_str.append("\t".join(li))
         if len(li_str)>0:
             myfunc.WriteFile("\n".join(li_str)+"\n", divide_finishedjoblogfile, "w", True)
@@ -346,6 +342,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
     allfinished_jobid_set = myfunc.ReadIDList2(allfinishedjoblogfile, col=0, delim="\t")
     li_str = []
     for li in new_finished_list:
+        li = [str(x) for x in li]
         jobid = li[0]
         if not jobid in allfinished_jobid_set:
             li_str.append("\t".join(li))
@@ -406,7 +403,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
                     origIndex_str = finished_id.split("_")[1]
                     finished_idx_set.add(origIndex_str)
 
-                all_idx_list = [str(x) for x in xrange(numseq)]
+                all_idx_list = [str(x) for x in range(numseq)]
                 torun_idx_str_list = list(set(all_idx_list)-finished_idx_set)
 
                 if len(finished_idx_set) > 0:
@@ -457,7 +454,7 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
         myfunc.WriteFile("", runjoblogfile, "w", True)
 
 #}}}
-def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
+def SubmitJob(jobid, cntSubmitJobDict, numseq_this_user):#{{{
 # for each job rstdir, keep three log files, 
 # 1.seqs finished, finished_seq log keeps all information, finished_index_log
 #   can be very compact to speed up reading, e.g.
@@ -540,7 +537,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
             return 1
         toRunDict = {}
         if os.path.exists(forceruntagfile):
-            for i in xrange(len(seqIDList)):
+            for i in range(len(seqIDList)):
                 toRunDict[i] = [seqList[i], 0, seqAnnoList[i]]
         else:
             con = sqlite3.connect(db_cache_SCAMPI2MSA)
@@ -554,12 +551,12 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                         top VARCHAR(30000),
                         PRIMARY KEY (md5)
                     )"""%(dbmsa_tablename))
-            for i in xrange(len(seqIDList)):
+            for i in range(len(seqIDList)):
                 seq = seqList[i]
                 description = seqAnnoList[i]
                 if not str(i) in init_finished_idx_set:
                     isSkip = False
-                    md5_key = hashlib.md5(seq).hexdigest()
+                    md5_key = hashlib.md5(seq.encode('utf-8')).hexdigest()
                     cmd =  "SELECT md5, seq, top FROM %s WHERE md5 =  \"%s\""%(
                             dbmsa_tablename, md5_key)
                     cur.execute(cmd)
@@ -577,7 +574,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                     if not isSkip:
                         toRunDict[i] = [seqList[i], 0, seqAnnoList[i]] #init value for numTM is 0
 
-        sortedlist = sorted(toRunDict.items(), key=lambda x:x[1][1], reverse=True)
+        sortedlist = sorted(list(toRunDict.items()), key=lambda x:x[1][1], reverse=True)
 
         # Write splitted fasta file and write a torunlist.txt
         if not os.path.exists(split_seq_dir):
@@ -636,7 +633,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                     wsdl_url), gen_errfile, "a", True)
                 break
 
-            [cnt, maxnum] = cntSubmitJobDict[node]
+            [cnt, maxnum, queue_method] = cntSubmitJobDict[node]
             MAX_SUBMIT_TRY = 3
             cnttry = 0
             while cnt < maxnum and iToRun < numToRun:
@@ -676,6 +673,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                 if len(seq) > 0:
                     query_para = {}
                     query_para['name_software'] = "scampi2-msa"
+                    query_para['queue_method'] = queue_method
 
                     para_str = json.dumps(query_para, sort_keys=True)
                     jobname = ""
@@ -727,7 +725,7 @@ def SubmitJob(jobid,cntSubmitJobDict, numseq_this_user):#{{{
                     if g_params['DEBUG']:
                         myfunc.WriteFile("DEBUG: jobid %s processedIndexSet.add(str(%d))\n"%(jobid, origIndex), gen_logfile, "a", True)
             # update cntSubmitJobDict for this node
-            cntSubmitJobDict[node] = [cnt, maxnum]
+            cntSubmitJobDict[node][0] = cnt
 
     # finally, append submitted_loginfo_list to remotequeue_idx_file 
     if len(submitted_loginfo_list)>0:
@@ -797,7 +795,7 @@ def GetResult(jobid):#{{{
             numseq = int(jobinfolist[3])
 
         if len(completed_idx_set) < numseq:
-            all_idx_list = [str(x) for x in xrange(numseq)]
+            all_idx_list = [str(x) for x in range(numseq)]
             torun_idx_str_list = list(set(all_idx_list)-completed_idx_set)
             for idx in torun_idx_str_list:
                 try:
@@ -820,7 +818,7 @@ def GetResult(jobid):#{{{
     lines = text.split("\n")
 
     nodeSet = set([])
-    for i in xrange(len(lines)):
+    for i in range(len(lines)):
         line = lines[i]
         if not line or line[0] == "#":
             continue
@@ -842,7 +840,7 @@ def GetResult(jobid):#{{{
             pass
 
 
-    for i in xrange(len(lines)):#{{{
+    for i in range(len(lines)):#{{{
         line = lines[i]
 
         if g_params['DEBUG']:
@@ -892,7 +890,7 @@ def GetResult(jobid):#{{{
                             gen_logfile, "a", True)
                     if myfunc.IsURLExist(result_url,timeout=5):
                         try:
-                            urllib.urlretrieve (result_url, outfile_zip)
+                            urllib.request.urlretrieve (result_url, outfile_zip)
                             isRetrieveSuccess = True
                             myfunc.WriteFile(" succeeded\n", gen_logfile, "a", True)
                         except:
@@ -916,7 +914,7 @@ def GetResult(jobid):#{{{
 
                             if isSuccess:
                                 # create or update the md5 cache
-                                md5_key = hashlib.md5(seq).hexdigest()
+                                md5_key = hashlib.md5(seq.encode('utf-8')).hexdigest()
                                 predfile = "%s/query.top"%( outpath_this_seq)
                                 (seqid, seqanno, top) = myfunc.ReadSingleFasta(predfile)
                                 if len(top) == len(seq):
@@ -1111,7 +1109,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         resultfile_text = "%s/%s"%(outpath_result, "query.top")
         (seqIDList, seqAnnoList, seqList) = myfunc.ReadFasta(seqfile)
         maplist = []
-        for i in xrange(len(seqIDList)):
+        for i in range(len(seqIDList)):
             maplist.append("%s\t%d\t%s\t%s"%("seq_%d"%i, len(seqList[i]),
                 seqAnnoList[i], seqList[i]))
         start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST").strip()
@@ -1142,7 +1140,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         # send the result to email
         if webcom.IsFrontEndNode(base_www_url) and myfunc.IsValidEmailAddress(email):
             webcom.SendEmail_on_finish(jobid, base_www_url,
-                    finish_status, name_server="SCAMPI2", from_email="SCAMPI@scampi.bioinfo.se",
+                    finish_status, name_server="SCAMPI2", from_email="no-reply.SCAMPI@bioinfo.se",
                     to_email=email, contact_email=contact_email,
                     logfile=runjob_logfile, errfile=runjob_errfile)
         webcom.CleanJobFolder_Scampi(rstdir)
@@ -1318,23 +1316,23 @@ def RunStatistics(path_result, path_log):#{{{
     # output countjob by country
     outfile_countjob_by_country = "%s/countjob_by_country.txt"%(path_stat)
     # sort by numseq in descending order
-    li_countjob = sorted(countjob_country.items(), key=lambda x:x[1][0], reverse=True) 
+    li_countjob = sorted(list(countjob_country.items()), key=lambda x:x[1][0], reverse=True) 
     li_str = []
     li_str.append("#Country\tNumSeq\tNumJob\tNumIP")
     for li in li_countjob:
         li_str.append("%s\t%d\t%d\t%d"%(li[0], li[1][0], li[1][1], len(li[1][2])))
-    myfunc.WriteFile(("\n".join(li_str)+"\n").encode('utf-8'), outfile_countjob_by_country, "w", True)
+    myfunc.WriteFile(("\n".join(li_str)+"\n").encode('utf-8'), outfile_countjob_by_country, "wb", True)
 
     flist = [outfile_numseqjob, outfile_numseqjob_web, outfile_numseqjob_wsdl  ]
     dictlist = [countjob_numseq_dict, countjob_numseq_dict_web, countjob_numseq_dict_wsdl]
-    for i in xrange(len(flist)):
+    for i in range(len(flist)):
         dt = dictlist[i]
         outfile = flist[i]
-        sortedlist = sorted(dt.items(), key = lambda x:x[0])
+        sortedlist = sorted(list(dt.items()), key = lambda x:x[0])
         if os.path.getsize(outfile) > 0:
             try:
                 fpout = open(outfile,"w")
-                for j in xrange(len(sortedlist)):
+                for j in range(len(sortedlist)):
                     nseq = sortedlist[j][0]
                     count = sortedlist[j][1]
                     fpout.write("%d\t%d\n"%(nseq,count))
@@ -1375,12 +1373,9 @@ def main(g_params):#{{{
             g_params['blackiplist'] = myfunc.ReadIDList(black_iplist_file)
 
         date_str = time.strftime(g_params['FORMAT_DATETIME'])
-        avail_computenode_list = myfunc.ReadIDList2(computenodefile, col=0)
-        num_avail_node = len(avail_computenode_list)
-        if loop == 0:
-            myfunc.WriteFile("[Date: %s] start %s. loop %d\n"%(date_str, progname, loop), gen_logfile, "a", True)
-        else:
-            myfunc.WriteFile("[Date: %s] loop %d\n"%(date_str, loop), gen_logfile, "a", True)
+        avail_computenode = webcom.ReadComputeNode(computenodefile) # return value is a dict
+        num_avail_node = len(avail_computenode)
+        webcom.loginfo("loop %d"%(loop), gen_logfile)
 
         CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,
                 finishedjoblogfile, loop)
@@ -1389,7 +1384,7 @@ def main(g_params):#{{{
         # runjoblogfile
         runjobidlist = myfunc.ReadIDList2(runjoblogfile,0)
         remotequeueDict = {}
-        for node in avail_computenode_list:
+        for node in avail_computenode:
             remotequeueDict[node] = []
         for jobid in runjobidlist:
             rstdir = "%s/%s"%(path_result, jobid)
@@ -1406,30 +1401,23 @@ def main(g_params):#{{{
                             remotequeueDict[node].append(remotejobid)
 
 
-        if loop % 500 == 10:
+        if loop % g_params['STATUS_UPDATE_FREQUENCY'][0] == g_params['STATUS_UPDATE_FREQUENCY'][1]:
             RunStatistics(path_result, path_log)
             webcom.DeleteOldResult(path_result, path_log, gen_logfile, MAX_KEEP_DAYS=g_params['MAX_KEEP_DAYS'])
-            webcom.CleanServerFile(gen_logfile, gen_errfile)
+            webcom.CleanServerFile(path_static, gen_logfile, gen_errfile)
+        webcom.ArchiveLogFile(path_log, threshold_logfilesize=threshold_logfilesize) 
 
-        for f in [gen_logfile, gen_errfile,
-                "%s/restart_qd_fe.cgi.log"%(path_log),
-                "%s/debug.log"%(path_log),
-                "%s/submit_job_to_queue.py.log"%(path_log)
-                ]:
-            if os.path.exists(f):
-                myfunc.ArchiveFile(f, threshold_logfilesize)
         # For finished jobs, clean data not used for caching
-
         cntSubmitJobDict = {} # format of cntSubmitJobDict {'node_ip': INT, 'node_ip': INT}
-        for node in avail_computenode_list:
-            #num_queue_job = GetNumSuqJob(node)
+        for node in avail_computenode:
+            queue_method = avail_computenode[node]['queue_method']
             num_queue_job = len(remotequeueDict[node])
             if num_queue_job >= 0:
                 cntSubmitJobDict[node] = [num_queue_job,
-                        g_params['MAX_SUBMIT_JOB_PER_NODE']] #[num_queue_job, max_allowed_job]
+                        g_params['MAX_SUBMIT_JOB_PER_NODE'], queue_method]
             else:
                 cntSubmitJobDict[node] = [g_params['MAX_SUBMIT_JOB_PER_NODE'],
-                        g_params['MAX_SUBMIT_JOB_PER_NODE']] #[num_queue_job, max_allowed_job]
+                        g_params['MAX_SUBMIT_JOB_PER_NODE'], queue_method]
 
 # entries in runjoblogfile includes jobs in queue or running
         hdl = myfunc.ReadLineByBlock(runjoblogfile)
@@ -1454,8 +1442,7 @@ def main(g_params):#{{{
                         rstdir = "%s/%s"%(path_result, jobid)
                         finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
                         status = strs[1]
-                        myfunc.WriteFile("CompNodeStatus: %s\n"%(str(cntSubmitJobDict)), gen_logfile, "a", True)
-
+                        webcom.loginfo("CompNodeStatus: %s"%(str(cntSubmitJobDict)), gen_logfile)
                         runjob_lockfile = "%s/%s/%s.lock"%(path_result, jobid, "runjob.lock")
                         if os.path.exists(runjob_lockfile):
                             msg = "runjob_lockfile %s exists, ignore the job %s" %(runjob_lockfile, jobid)
@@ -1463,7 +1450,7 @@ def main(g_params):#{{{
                             myfunc.WriteFile("[%s] %s\n"%(date_str, msg), gen_logfile, "a", True)
                             continue
 
-                        if IsHaveAvailNode(cntSubmitJobDict):
+                        if webcom.IsHaveAvailNode(cntSubmitJobDict):
                             if not g_params['DEBUG_NO_SUBMIT']:
                                 SubmitJob(jobid, cntSubmitJobDict, numseq_this_user)
                         GetResult(jobid) # the start tagfile is written when got the first result
@@ -1472,10 +1459,9 @@ def main(g_params):#{{{
                 lines = hdl.readlines()
             hdl.close()
 
-        myfunc.WriteFile("sleep for %d seconds\n"%(g_params['SLEEP_INTERVAL']), gen_logfile, "a", True)
+        webcom.loginfo("sleep for %d seconds"%(g_params['SLEEP_INTERVAL']), gen_logfile)
         time.sleep(g_params['SLEEP_INTERVAL'])
         loop += 1
-
 
     return 0
 #}}}
@@ -1493,14 +1479,14 @@ def InitGlobalParameter():#{{{
     g_params['MAX_TIME_IN_REMOTE_QUEUE'] = 3600*24 # one day in seconds
     g_params['MAX_KEEP_DAYS'] = 60
     g_params['MAX_RESUBMIT'] = 2
+    g_params['TZ'] = "Europe/Stockholm"
     g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
+    g_params['STATUS_UPDATE_FREQUENCY'] = [500, 50]  # updated by if loop%$1 == $2
     return g_params
 #}}}
 if __name__ == '__main__' :
     g_params = InitGlobalParameter()
-
     date_str = time.strftime(g_params['FORMAT_DATETIME'])
-    print >> sys.stderr, "\n\n[Date: %s]\n"%(date_str)
-    status = main(g_params)
-
-    sys.exit(status)
+    print("\n#%s#\n[Date: %s] qd_fe.py restarted"%('='*80,date_str))
+    sys.stdout.flush()
+    sys.exit(main(g_params))

@@ -11,7 +11,8 @@
 #   try
 import os
 import sys
-import myfunc
+from libpredweb import myfunc
+from libpredweb import webserver_common as webcom
 import subprocess
 import time
 import math
@@ -27,10 +28,6 @@ basedir = os.path.realpath("%s/../"%(rundir))
 python_exec = os.path.realpath("%s/../../env/bin/python"%(basedir))
 virt_env_path = os.path.realpath("%s/../../env"%(basedir))
 suq_basedir = "/tmp"
-if os.path.exists("/scratch"):
-    suq_basedir = "/scratch"
-elif os.path.exists("/tmp"):
-    suq_basedir = "/tmp"
 suq_exec = "/usr/bin/suq";
 gen_errfile = "%s/static/log/%s.log"%(basedir, progname)
 
@@ -64,9 +61,9 @@ Examples:
 """%(progname)
 
 def PrintHelp(fpout=sys.stdout):#{{{
-    print >> fpout, usage_short
-    print >> fpout, usage_ext
-    print >> fpout, usage_exp#}}}
+    print(usage_short, file=fpout)
+    print(usage_ext, file=fpout)
+    print(usage_exp, file=fpout)#}}}
 def GetNumSameUserInQueue(suq_ls_content, basename_scriptfile, email, host_ip):#{{{
     myfunc.WriteFile("Entering GetNumSameUserInQueue()\n", g_params['debugfile'], "a")
     num_same_user_in_queue = 0
@@ -126,7 +123,7 @@ def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, 
     myfunc.WriteFile(msg+"\n", g_params['debugfile'], "a")
 
     myfunc.WriteFile(code, scriptfile)
-    os.chmod(scriptfile, 0755)
+    os.chmod(scriptfile, 0o755)
 
     myfunc.WriteFile("Getting priority"+"\n", g_params['debugfile'], "a")
     priority = myfunc.GetSuqPriority(numseq_this_user)
@@ -156,9 +153,9 @@ def SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile):#{{{
             rmsg = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             isSubmitSuccess = True
             break
-        except subprocess.CalledProcessError, e:
-            print  e
-            print rmsg
+        except subprocess.CalledProcessError as e:
+            print(e)
+            print(rmsg)
             myfunc.WriteFile(str(e)+"\n"+rmsg+"\n", g_params['debugfile'], "a")
             pass
         cnttry += 1
@@ -191,7 +188,7 @@ def main(g_params):#{{{
     isNonOptionArg=False
     while i < numArgv:
         if isNonOptionArg == True:
-            print >> g_params['fperr'], "Error! Wrong argument:", argv[i]
+            webcom.loginfo("Error! Wrong argument:"%(argv[i]), gen_errfile)
             return 1
             isNonOptionArg = False
             i += 1
@@ -230,36 +227,36 @@ def main(g_params):#{{{
                 g_params['isQuiet'] = True
                 i += 1
             else:
-                print >> g_params['fperr'], "Error! Wrong argument:", argv[i]
+                webcom.loginfo("Error! Wrong argument:"%(argv[i]), gen_errfile)
                 return 1
         else:
-            print >> g_params['fperr'], "Error! Wrong argument:", argv[i]
+            webcom.loginfo("Error! Wrong argument:"%(argv[i]), gen_errfile)
             return 1
 
     if outpath == "":
-        print >> g_params['fperr'], "outpath not set. exit"
+        webcom.loginfo("outpath not set. exit", gen_errfile)
         return 1
     elif not os.path.exists(outpath):
         cmd =  ["mkdir", "-p", outpath]
         try:
             rmsg = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError, e:
-            print e
-            print rmsg
+        except subprocess.CalledProcessError as e:
+            print(e)
+            print(rmsg)
             return 1
 
     if jobid == "":
-        print >> g_params['fperr'], "%s: jobid not set. exit"%(sys.argv[0])
+        webcom.loginfo("%s: jobid not set. exit"%(sys.argv[0]), gen_errfile)
         return 1
 
     if datapath == "":
-        print >> g_params['fperr'], "%s: datapath not set. exit"%(sys.argv[0])
+        webcom.loginfo("%s: datapath not set. exit"%(sys.argv[0]), gen_errfile)
         return 1
     elif not os.path.exists(datapath):
-        print >> g_params['fperr'], "%s: datapath does not exist. exit"%(sys.argv[0])
+        webcom.loginfo("%s: datapath does not exist. exit"%(sys.argv[0]), gen_errfile)
         return 1
     elif not os.path.exists("%s/query.fa"%(datapath)):
-        print >> g_params['fperr'], "%s: file %s/query.fa does not exist. exit"%(sys.argv[0], datapath)
+        webcom.loginfo("%s: file %s/query.fa does not exist. exit"%(sys.argv[0], datapath),gen_errfile)
         return 1
 
     g_params['debugfile'] = "%s/debug.log"%(outpath)
@@ -274,19 +271,9 @@ def InitGlobalParameter():#{{{
     g_params['isQuiet'] = True
     g_params['isForceRun'] = False
     g_params['isOnlyGetCache'] = False
-    g_params['fperr'] = None
     return g_params
 #}}}
 if __name__ == '__main__' :
     g_params = InitGlobalParameter()
-    try:
-        g_params['fperr'] = open(gen_errfile, "a")
-    except IOError:
-        g_params['fperr'] = sys.stderr
-        pass
-    g_params = InitGlobalParameter()
-    status = main(g_params)
-    if g_params['fperr'] and g_params['fperr'] != sys.stderr:
-        g_params['fperr'].close()
-    sys.exit(status)
+    sys.exit(main(g_params))
 

@@ -1,0 +1,2 @@
+localhost
+dev.scampi.bioinfo.se

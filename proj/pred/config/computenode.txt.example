@@ -1,1 +1,2 @@
-commonbackend.computenode.pcons3.se 3
+# NodeName Max_paralell_process queue_method
+commonbackend.computenode.pcons3.se 8 suq
