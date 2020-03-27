@@ -1406,7 +1406,7 @@ def main(g_params):#{{{
                             remotequeueDict[node].append(remotejobid)
 
 
-        if loop % 500 == 10:
+        if loop % g_params['STATUS_UPDATE_FREQUENCY'][0] == g_params['STATUS_UPDATE_FREQUENCY'][1]:
             RunStatistics(path_result, path_log)
             webcom.DeleteOldResult(path_result, path_log, gen_logfile, MAX_KEEP_DAYS=g_params['MAX_KEEP_DAYS'])
             webcom.CleanServerFile(gen_logfile, gen_errfile)
@@ -1492,6 +1492,7 @@ def InitGlobalParameter():#{{{
     g_params['MAX_SUBMIT_JOB_PER_NODE'] = 200
     g_params['MAX_TIME_IN_REMOTE_QUEUE'] = 3600*24 # one day in seconds
     g_params['MAX_KEEP_DAYS'] = 60
+    g_params['STATUS_UPDATE_FREQUENCY'] = [5000, 500]  # updated by if loop%$1 == $2
     g_params['MAX_RESUBMIT'] = 2
     g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
     return g_params
