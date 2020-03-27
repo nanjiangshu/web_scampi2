@@ -262,9 +262,9 @@ def CreateRunJoblog(path_result, submitjoblogfile, runjoblogfile,#{{{
             starttagfile = "%s/%s"%(rstdir, "runjob.start")
             finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
             if os.path.exists(starttagfile):
-                start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST")
+                start_date_str = myfunc.ReadFile(starttagfile).strip()
             if os.path.exists(finishtagfile):
-                finish_date_str = myfunc.ReadFile(finishtagfile).strip().rstrip("CEST")
+                finish_date_str = myfunc.ReadFile(finishtagfile).strip()
 
             jobinfofile = "%s/jobinfo"%(rstdir)
             jobinfo = myfunc.ReadFile(jobinfofile).strip()
@@ -1114,7 +1114,7 @@ def CheckIfJobFinished(jobid, numseq, email):#{{{
         for i in xrange(len(seqIDList)):
             maplist.append("%s\t%d\t%s\t%s"%("seq_%d"%i, len(seqList[i]),
                 seqAnnoList[i], seqList[i]))
-        start_date_str = myfunc.ReadFile(starttagfile).strip().rstrip("CEST").strip()
+        start_date_str = myfunc.ReadFile(starttagfile).strip()
         start_date_epoch = webcom.datetime_str_to_epoch(start_date_str)
         all_runtime_in_sec = float(date_str_epoch) - float(start_date_epoch)
 
