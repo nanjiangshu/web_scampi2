@@ -174,7 +174,7 @@ def datetime_str_to_time(date_str):# {{{
     if len(strs) == 2:
         date_str += " UTC"
     if len(strs) == 3 and strs[2] == "U":
-        date_str.replace("U", "UTC")
+        date_str = date_str.replace("U", "UTC")
     dt = dtparser.parse(date_str)
     return dt
 # }}}
