@@ -1499,9 +1499,7 @@ def InitGlobalParameter():#{{{
 #}}}
 if __name__ == '__main__' :
     g_params = InitGlobalParameter()
-
     date_str = time.strftime(g_params['FORMAT_DATETIME'])
-    print >> sys.stderr, "\n\n[Date: %s]\n"%(date_str)
-    status = main(g_params)
-
-    sys.exit(status)
+    print("\n#%s#\n[Date: %s] qd_fe.py restarted"%('='*80,date_str))
+    sys.stdout.flush()
+    sys.exit(main(g_params))
