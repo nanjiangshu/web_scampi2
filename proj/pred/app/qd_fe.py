@@ -864,6 +864,7 @@ def GetResult(jobid):#{{{
         try:
             myclient = myclientDict[node]
         except KeyError:
+            keep_queueline_list.append(line)
             continue
         try:
             rtValue = myclient.service.checkjob(remote_jobid)
@@ -874,6 +875,7 @@ def GetResult(jobid):#{{{
             pass
         isSuccess = False
         isFinish_remote = False
+        status = ""
         if len(rtValue) >= 1:
             ss2 = rtValue[0]
             if len(ss2)>=3:
@@ -1027,7 +1029,7 @@ def GetResult(jobid):#{{{
             # running) delete it and try to resubmit it. This solved the
             # problem of dead jobs in the remote server due to server
             # rebooting)
-            if status != "Running" and time_in_remote_queue > g_params['MAX_TIME_IN_REMOTE_QUEUE']:
+            if status != "Running" and status != "" and time_in_remote_queue > g_params['MAX_TIME_IN_REMOTE_QUEUE']:
                 # delete the remote job on the remote server
                 try:
                     rtValue2 = myclient.service.deletejob(remote_jobid)
@@ -1051,6 +1053,7 @@ def GetResult(jobid):#{{{
         myfunc.WriteFile("\n".join(resubmit_idx_list)+"\n", torun_idx_file, "a", True)
 
     if len(keep_queueline_list)>0:
+        keep_queueline_list = list(set(keep_queueline_list))
         myfunc.WriteFile("\n".join(keep_queueline_list)+"\n", remotequeue_idx_file, "w", True);
     else:
         myfunc.WriteFile("", remotequeue_idx_file, "w", True);
