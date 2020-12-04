@@ -27,8 +27,6 @@ rundir = os.path.dirname(os.path.realpath(__file__))
 basedir = os.path.realpath("%s/../"%(rundir))
 python_exec = os.path.realpath("%s/../../env/bin/python"%(basedir))
 virt_env_path = os.path.realpath("%s/../../env"%(basedir))
-suq_basedir = "/tmp"
-suq_exec = "/usr/bin/suq";
 gen_errfile = "%s/static/log/%s.log"%(basedir, progname)
 
 usage_short="""
@@ -110,64 +108,9 @@ def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, 
 
     myfunc.WriteFile("priority=%d\n"%(priority), g_params['debugfile'], "a")
 
-    st1 = SubmitSlurmJob(datapath, outpath, priority, scriptfile)
+    st1 = webcom.SubmitSlurmJob(datapath, outpath, scriptfile, g_params['debugfile'])
 
     return st1
-#}}}
-def SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile):#{{{
-    myfunc.WriteFile("Entering SubmitSuqJob()\n", g_params['debugfile'], "a")
-    rmsg = ""
-    cmd = [suq_exec,"-b", suq_basedir, "run", "-d", outpath, "-p", "%d"%(priority), scriptfile]
-    cmdline = " ".join(cmd)
-    myfunc.WriteFile("cmdline: %s\n\n"%(cmdline), g_params['debugfile'], "a")
-    MAX_TRY = 5
-    cnttry = 0
-    isSubmitSuccess = False
-    while cnttry < MAX_TRY:
-        try:
-            myfunc.WriteFile("run cmd: cnttry = %d, MAX_TRY=%d\n"%(cnttry,
-                MAX_TRY), g_params['debugfile'], "a")
-            rmsg = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            isSubmitSuccess = True
-            break
-        except subprocess.CalledProcessError as e:
-            print(e)
-            print(rmsg)
-            myfunc.WriteFile(str(e)+"\n"+rmsg+"\n", g_params['debugfile'], "a")
-            pass
-        cnttry += 1
-        time.sleep(0.05+cnttry*0.03)
-    if isSubmitSuccess:
-        myfunc.WriteFile("Leaving SubmitSuqJob() with success\n\n", g_params['debugfile'], "a")
-        return 0
-    else:
-        myfunc.WriteFile("Leaving SubmitSuqJob() with error\n\n", g_params['debugfile'], "a")
-        return 1
-#}}}
-def SubmitSlurmJob(datapath, outpath, priority, scriptfile):#{{{
-    webcom.loginfo("Entering SubmitSlurmJob()", g_params['debugfile'])
-    rmsg = ""
-    os.chdir(outpath)
-    cmd = ['sbatch', scriptfile]
-    cmdline = " ".join(cmd)
-    webcom.loginfo("cmdline: %s\n\n"%(cmdline), g_params['debugfile'])
-    MAX_TRY = 2
-    cnttry = 0
-    isSubmitSuccess = False
-    while cnttry < MAX_TRY:
-        webcom.loginfo("run cmd: cnttry = %d, MAX_TRY=%d\n"%(cnttry,
-            MAX_TRY), g_params['debugfile'])
-        (isSubmitSuccess, t_runtime) = webcom.RunCmd(cmd, g_params['debugfile'], g_params['debugfile'])
-        if isSubmitSuccess:
-            break
-        cnttry += 1
-        time.sleep(0.05+cnttry*0.03)
-    if isSubmitSuccess:
-        webcom.loginfo("Leaving SubmitSlurmJob() with success\n", g_params['debugfile'])
-        return 0
-    else:
-        webcom.loginfo("Leaving SubmitSlurmJob() with error\n\n", g_params['debugfile'])
-        return 1
 #}}}
 def main(g_params):#{{{
     argv = sys.argv
