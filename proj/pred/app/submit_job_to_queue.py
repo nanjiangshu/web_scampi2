@@ -64,29 +64,6 @@ def PrintHelp(fpout=sys.stdout):#{{{
     print(usage_short, file=fpout)
     print(usage_ext, file=fpout)
     print(usage_exp, file=fpout)#}}}
-def GetNumSameUserInQueue(suq_ls_content, basename_scriptfile, email, host_ip):#{{{
-    myfunc.WriteFile("Entering GetNumSameUserInQueue()\n", g_params['debugfile'], "a")
-    num_same_user_in_queue = 0
-    if email == "" and host_ip == "":
-        num_same_user_in_queue = 0
-    else:
-        lines = suq_ls_content.split("\n")
-        if email != "" and host_ip != "":
-            for line in lines:
-                if line.find(email) != -1 or line.find(host_ip) != -1:
-                    num_same_user_in_queue += 1
-        elif email != "":
-            for line in lines:
-                if line.find(email) != -1:
-                    num_same_user_in_queue += 1
-        elif host_ip != "":
-            for line in lines:
-                if line.find(host_ip) != -1:
-                    num_same_user_in_queue += 1
-
-    return num_same_user_in_queue
-#}}}
-
 
 def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, #{{{
         host_ip, base_www_url, app_type):
@@ -133,7 +110,7 @@ def SubmitJobToQueue(jobid, datapath, outpath, numseq, numseq_this_user, email, 
 
     myfunc.WriteFile("priority=%d\n"%(priority), g_params['debugfile'], "a")
 
-    st1 = SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile)
+    st1 = SubmitSlurmJob(datapath, outpath, priority, scriptfile)
 
     return st1
 #}}}
@@ -165,6 +142,31 @@ def SubmitSuqJob(suq_basedir, datapath, outpath, priority, scriptfile):#{{{
         return 0
     else:
         myfunc.WriteFile("Leaving SubmitSuqJob() with error\n\n", g_params['debugfile'], "a")
+        return 1
+#}}}
+def SubmitSlurmJob(datapath, outpath, priority, scriptfile):#{{{
+    webcom.loginfo("Entering SubmitSlurmJob()", g_params['debugfile'])
+    rmsg = ""
+    os.chdir(outpath)
+    cmd = ['sbatch', scriptfile]
+    cmdline = " ".join(cmd)
+    webcom.loginfo("cmdline: %s\n\n"%(cmdline), g_params['debugfile'])
+    MAX_TRY = 2
+    cnttry = 0
+    isSubmitSuccess = False
+    while cnttry < MAX_TRY:
+        webcom.loginfo("run cmd: cnttry = %d, MAX_TRY=%d\n"%(cnttry,
+            MAX_TRY), g_params['debugfile'])
+        (isSubmitSuccess, t_runtime) = webcom.RunCmd(cmd, g_params['debugfile'], g_params['debugfile'])
+        if isSubmitSuccess:
+            break
+        cnttry += 1
+        time.sleep(0.05+cnttry*0.03)
+    if isSubmitSuccess:
+        webcom.loginfo("Leaving SubmitSlurmJob() with success\n", g_params['debugfile'])
+        return 0
+    else:
+        webcom.loginfo("Leaving SubmitSlurmJob() with error\n\n", g_params['debugfile'])
         return 1
 #}}}
 def main(g_params):#{{{
