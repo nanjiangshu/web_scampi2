@@ -89,9 +89,6 @@ g_params['SITE_ROOT'] = SITE_ROOT
 g_params['path_result'] = path_result
 g_params['MAX_ACTIVE_USER'] = 10
 
-suq_basedir = "/tmp"
-suq_exec = "/usr/bin/suq";
-
 python_exec = "python"
 
 qd_fe_scriptfile = "%s/qd_fe.py"%(path_app)
