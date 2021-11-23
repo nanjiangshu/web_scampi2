@@ -372,6 +372,7 @@ def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
     rstdir = "%s/%s"%(path_result, query['jobid'])
     runjob_logfile = "%s/runjob.log"%(rstdir)
     runjob_errfile = "%s/runjob.err"%(rstdir)
+    failedtagfile = "%s/%s"%(rstdir, "runjob.failed")
     debugfile = "%s/debug.log"%(rstdir) #this log only for debugging
     rmsg = ""
 
