@@ -623,7 +623,7 @@ def SubmitJob(jobid, cntSubmitJobDict, numseq_this_user):#{{{
             wsdl_url = "http://%s/pred/api_submitseq/?wsdl"%(node)
             try:
                 myclient = Client(wsdl_url, cache=None, timeout=30)
-            except Exception as e::
+            except Exception as e:
                 date_str = time.strftime(g_params['FORMAT_DATETIME'])
                 myfunc.WriteFile("[Date: %s] Failed to access %s with errmsg %s\n"%(date_str,
                     wsdl_url, str(e)), gen_errfile, "a", True)
