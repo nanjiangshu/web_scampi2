@@ -1354,6 +1354,8 @@ def main(g_params):#{{{
 
     loop = 0
     while 1:
+        base_www_url_file = "%s/static/log/base_www_url.txt"%(basedir)
+        base_www_url = myfunc.ReadFile(base_www_url_file).strip()
 
         # load the config file if exists
         configfile = "%s/config/config.json"%(basedir)
@@ -1424,6 +1426,7 @@ def main(g_params):#{{{
                     strs = line.split("\t")
                     if len(strs) >= 11:
                         jobid = strs[0]
+                        client_ip = strs[3]
                         email = strs[4]
                         try:
                             numseq = int(strs[5])
@@ -1431,11 +1434,16 @@ def main(g_params):#{{{
                             numseq = 1
                             pass
                         try:
-                            numseq_this_user = int(strs[10])
+                            app_type = strs[10]
+                        except:
+                            app_type = 'None'
+                        try:
+                            numseq_this_user = int(strs[11])
                         except:
                             numseq_this_user = 1
                             pass
                         rstdir = "%s/%s"%(path_result, jobid)
+                        forceruntagfile = "%s/forcerun"%(rstdir)
                         finishtagfile = "%s/%s"%(rstdir, "runjob.finish")
                         status = strs[1]
                         webcom.loginfo("CompNodeStatus: %s"%(str(cntSubmitJobDict)), gen_logfile)
@@ -1445,6 +1453,24 @@ def main(g_params):#{{{
                             date_str = time.strftime(g_params['FORMAT_DATETIME'])
                             myfunc.WriteFile("[%s] %s\n"%(date_str, msg), gen_logfile, "a", True)
                             continue
+
+                        if app_type == "SCAMPI-single":
+                            query = {}
+                            query['jobid'] = jobid
+                            query['numseq'] = numseq
+                            query['numseq_this_user'] = numseq_this_user
+                            query['base_www_url'] = base_www_url
+                            query['email'] = email
+                            query['client_ip'] = client_ip
+                            query['app_type'] = app_type
+                            if os.path.exists(forceruntagfile):
+                                query['isForceRun'] = True
+                            else:
+                                query['isForceRun'] = False
+                            tmpdir = os.path.join(rstdir, "tmp1")
+                            if not os.path.exists(tmpdir):
+                                os.makedirs(tmpdir)
+                            webcom.SubmitQueryToLocalQueue(query, tmpdir, rstdir, g_params, isOnlyGetCache=False)
 
                         if webcom.IsHaveAvailNode(cntSubmitJobDict):
                             if not g_params['DEBUG_NO_SUBMIT']:
@@ -1478,6 +1504,12 @@ def InitGlobalParameter():#{{{
     g_params['TZ'] = "Europe/Stockholm"
     g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
     g_params['STATUS_UPDATE_FREQUENCY'] = [500, 50]  # updated by if loop%$1 == $2
+    g_params['path_result'] = path_result
+    g_params['path_static'] = path_static
+    g_params['SITE_ROOT'] = basedir
+    g_params['gen_logfile'] = gen_logfile
+    g_params['gen_errfile'] = gen_errfile
+    g_params['path_cache'] = path_cache
     return g_params
 #}}}
 if __name__ == '__main__' :
