@@ -25,6 +25,7 @@ import json
 import urllib.request, urllib.parse, urllib.error
 import shutil
 import hashlib
+from suds.client import Client
 import subprocess
 import numpy
 
@@ -622,10 +623,10 @@ def SubmitJob(jobid, cntSubmitJobDict, numseq_this_user):#{{{
             wsdl_url = "http://%s/pred/api_submitseq/?wsdl"%(node)
             try:
                 myclient = Client(wsdl_url, cache=None, timeout=30)
-            except:
+            except Exception as e::
                 date_str = time.strftime(g_params['FORMAT_DATETIME'])
-                myfunc.WriteFile("[Date: %s] Failed to access %s\n"%(date_str,
-                    wsdl_url), gen_errfile, "a", True)
+                myfunc.WriteFile("[Date: %s] Failed to access %s with errmsg %s\n"%(date_str,
+                    wsdl_url, str(e)), gen_errfile, "a", True)
                 break
 
             [cnt, maxnum, queue_method] = cntSubmitJobDict[node]
