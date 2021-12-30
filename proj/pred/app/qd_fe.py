@@ -1478,6 +1478,12 @@ def InitGlobalParameter():#{{{
     g_params['TZ'] = "Europe/Stockholm"
     g_params['FORMAT_DATETIME'] = webcom.FORMAT_DATETIME
     g_params['STATUS_UPDATE_FREQUENCY'] = [500, 50]  # updated by if loop%$1 == $2
+    g_params['path_result'] = path_result
+    g_params['path_static'] = path_static
+    g_params['SITE_ROOT'] = basedir
+    g_params['gen_logfile'] = gen_logfile
+    g_params['gen_errfile'] = gen_errfile
+    g_params['path_cache'] = path_cache
     return g_params
 #}}}
 if __name__ == '__main__' :
