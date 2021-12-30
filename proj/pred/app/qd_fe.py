@@ -1455,6 +1455,7 @@ def main(g_params):#{{{
                             continue
 
                         if app_type == "SCAMPI-single":
+                            query = {}
                             query['jobid'] = jobid
                             query['numseq'] = numseq
                             query['numseq_this_user'] = numseq_this_user
