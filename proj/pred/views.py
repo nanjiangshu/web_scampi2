@@ -365,6 +365,9 @@ def RunQuery_wsdl_local(rawseq, filtered_seq, seqinfo):#{{{
         return jobid
 #}}}
 def SubmitQueryToLocalQueue(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
+    return webcom.SubmitQueryToLocalQueue(query, tmpdir, rstdir, g_params, isOnlyGetCache)
+#}}}
+def SubmitQueryToLocalQueue_obselete(query, tmpdir, rstdir, isOnlyGetCache=False):#{{{
     scriptfile = "%s/app/submit_job_to_queue.py"%(SITE_ROOT)
     rstdir = "%s/%s"%(path_result, query['jobid'])
     runjob_logfile = "%s/runjob.log"%(rstdir)
