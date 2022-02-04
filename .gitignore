@@ -22,5 +22,5 @@ bak.env/
 soft/blast
 
 proj/settings.py
-proj/pred/config/computenode.txt
+proj/pred/config/*.txt
 proj/pred/config/config.json
