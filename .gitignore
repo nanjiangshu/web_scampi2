@@ -24,3 +24,5 @@ soft/blast
 proj/settings.py
 proj/pred/config/*.txt
 proj/pred/config/config.json
+proj/allowed_host_dev.txt
+proj/allowed_host_pro.txt
