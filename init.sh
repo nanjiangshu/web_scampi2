@@ -23,7 +23,7 @@ $rundir/proj/pred/static/log/divided
 "
 
 echo "setting up file permissions"
-platform_info=`python -mplatform |  tr '[:upper:]' '[:lower:]'`
+platform_info=`python3 -mplatform |  tr '[:upper:]' '[:lower:]'`
 platform=
 case $platform_info in 
     *centos*)platform=centos;;
@@ -56,7 +56,7 @@ for dir in  $dirlist; do
         exec_cmd "sudo mkdir -p $dir"
     fi
     exec_cmd "sudo chmod 755 $dir"
-    exec_cmd "sudo chown $user:$group $dir"
+    exec_cmd "sudo chown -R $user:$group $dir"
 done
 
 logfile_submit=$rundir/proj/pred/static/log/submitted_seq.log
@@ -71,8 +71,27 @@ if [ ! -f $rundir/proj/settings.py -a ! -L $rundir/proj/settings.py ];then
     pushd $rundir/proj; ln -s pro_settings.py settings.py; popd;
 fi
 
+# create allowed host
+conf_file_list="
+$rundir/proj/allowed_host_dev.txt
+$rundir/proj/allowed_host_pro.txt
+"
+for file in $conf_file_list; do
+    if [ ! -f $file ];then
+        cp ${file}.example ${file}
+    fi
+done
+
 # create example result
-pushd $rundir/proj/pred/static/result &&\
-    if [ ! -d example_scampi_single ]; then sudo ln -s ../download/example/example_scampi_single  . ; fi &&\
-    if [ ! -d example_scampi_msa ]; then sudo ln -s ../download/example/example_scampi_msa . ; fi &&\
-    popd
+example_folder_list="
+example_scampi_single
+example_scampi_msa
+"
+pushd $rundir/proj/pred/static/result
+
+for item in $example_folder_list; do
+    if [ ! -d $item ]; then
+        sudo ln -s ../download/example/$item  .
+    fi
+done
+popd
