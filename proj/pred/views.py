@@ -224,13 +224,13 @@ def submit_seq(request):#{{{
                     os.system(cmd)
 
                 if query['numseq'] < 0: #go to result page anyway
-                    query['jobcounter'] = GetJobCounter(info)
+                    query['jobcounter'] = webcom.GetJobCounter(info)
                     return render(request, 'pred/thanks.html', query)
                 else:
                     return get_results(request, jobid)
 
             else:
-                query['jobcounter'] = GetJobCounter(info)
+                query['jobcounter'] = webcom.GetJobCounter(info)
                 return render(request, 'pred/badquery.html', query)
 
     # if a GET (or any other method) we'll create a blank form
